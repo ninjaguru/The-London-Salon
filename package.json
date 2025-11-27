@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@google/genai": "^0.1.1",
+    "@google/genai": "*",
     "jspdf": "^2.5.1",
     "lucide-react": "latest",
     "react": "^18.3.1",
