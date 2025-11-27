@@ -1,0 +1,265 @@
+
+import React, { useState, useEffect } from 'react';
+import { db, exportToCSV } from '../services/db';
+import { Staff as StaffType, Role, AppointmentStatus, Appointment } from '../types';
+import { Plus, Edit2, Trash2, CheckCircle, XCircle, Download, Target, DollarSign, TrendingUp } from 'lucide-react';
+import Modal from './ui/Modal';
+
+const Staff: React.FC = () => {
+  const [staffList, setStaffList] = useState<StaffType[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingStaff, setEditingStaff] = useState<StaffType | null>(null);
+
+  // Form State
+  const [name, setName] = useState('');
+  const [role, setRole] = useState<Role>(Role.HairStylist);
+  const [specialties, setSpecialties] = useState('');
+  const [target, setTarget] = useState(0);
+  const [salary, setSalary] = useState(0);
+
+  useEffect(() => {
+    setStaffList(db.staff.getAll());
+    setAppointments(db.appointments.getAll());
+  }, []);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const specs = specialties.split(',').map(s => s.trim()).filter(Boolean);
+    
+    let newList;
+    const staffData = {
+        name,
+        role,
+        specialties: specs,
+        target,
+        salary,
+    };
+
+    if (editingStaff) {
+      newList = staffList.map(s => s.id === editingStaff.id ? { ...s, ...staffData } : s);
+    } else {
+      const newStaff: StaffType = {
+        id: crypto.randomUUID(),
+        ...staffData,
+        active: true
+      };
+      newList = [...staffList, newStaff];
+    }
+    
+    setStaffList(newList);
+    db.staff.save(newList);
+    closeModal();
+  };
+
+  const handleDelete = (id: string) => {
+    if (confirm('Are you sure you want to delete this staff member?')) {
+      const newList = staffList.filter(s => s.id !== id);
+      setStaffList(newList);
+      db.staff.save(newList);
+    }
+  };
+
+  const openModal = (staff?: StaffType) => {
+    if (staff) {
+      setEditingStaff(staff);
+      setName(staff.name);
+      setRole(staff.role);
+      setSpecialties(staff.specialties.join(', '));
+      setTarget(staff.target || 0);
+      setSalary(staff.salary || 0);
+    } else {
+      setEditingStaff(null);
+      setName('');
+      setRole(Role.HairStylist);
+      setSpecialties('');
+      setTarget(0);
+      setSalary(0);
+    }
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingStaff(null);
+  };
+
+  // Helper to calculate this month's revenue for a staff member
+  const getStaffMetrics = (staffId: string) => {
+      const now = new Date();
+      const currentMonth = now.toISOString().slice(0, 7); // YYYY-MM
+      
+      const monthlyAppointments = appointments.filter(a => 
+          a.staffId === staffId && 
+          a.status === AppointmentStatus.Completed &&
+          a.date.startsWith(currentMonth)
+      );
+
+      const revenue = monthlyAppointments.reduce((acc, curr) => acc + curr.price, 0);
+      return { revenue };
+  };
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-gray-800">Staff Management</h2>
+        <div className="flex gap-2">
+            <button 
+                onClick={() => exportToCSV(staffList, 'staff')}
+                className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm"
+            >
+                <Download className="w-4 h-4 mr-2" /> Export
+            </button>
+            <button 
+            onClick={() => openModal()}
+            className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+            >
+            <Plus size={18} /> Add Staff
+            </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {staffList.map((staff) => {
+             const metrics = getStaffMetrics(staff.id);
+             const currentTarget = staff.target || 1; // avoid divide by zero
+             const percentAchieved = Math.min((metrics.revenue / currentTarget) * 100, 100);
+
+             return (
+              <div key={staff.id} className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow border border-gray-200 overflow-hidden flex flex-col">
+                  {/* Card Header */}
+                  <div className="p-5 flex justify-between items-start border-b border-gray-50 bg-gray-50/50">
+                      <div className="flex items-center">
+                          <div className="h-12 w-12 rounded-full bg-gradient-to-br from-rose-400 to-purple-500 flex items-center justify-center text-white font-bold text-lg shadow-sm">
+                              {staff.name.charAt(0)}
+                          </div>
+                          <div className="ml-4">
+                              <h3 className="text-lg font-bold text-gray-900">{staff.name}</h3>
+                              <span className="px-2 py-0.5 inline-flex text-xs leading-4 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                  {staff.role}
+                              </span>
+                          </div>
+                      </div>
+                      <div className="flex space-x-1">
+                          <button onClick={() => openModal(staff)} className="text-gray-400 hover:text-indigo-600 p-1"><Edit2 size={16} /></button>
+                          <button onClick={() => handleDelete(staff.id)} className="text-gray-400 hover:text-red-600 p-1"><Trash2 size={16} /></button>
+                      </div>
+                  </div>
+
+                  {/* Card Body */}
+                  <div className="p-5 flex-1 flex flex-col space-y-4">
+                      {/* Specialties */}
+                      <div>
+                          <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Specialties</p>
+                          <div className="flex flex-wrap gap-1">
+                              {staff.specialties.map((spec, i) => (
+                                  <span key={i} className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded border border-gray-200">{spec}</span>
+                              ))}
+                              {staff.specialties.length === 0 && <span className="text-xs text-gray-400 italic">None listed</span>}
+                          </div>
+                      </div>
+                      
+                      {/* Monthly Target Section */}
+                      <div>
+                           <div className="flex justify-between items-end mb-1">
+                                <p className="text-xs text-gray-500 uppercase font-semibold flex items-center">
+                                    <Target size={12} className="mr-1"/> Monthly Target
+                                </p>
+                                <span className="text-xs font-bold text-gray-700">
+                                    ₹{metrics.revenue.toLocaleString()} / ₹{(staff.target || 0).toLocaleString()}
+                                </span>
+                           </div>
+                           <div className="w-full bg-gray-200 rounded-full h-2.5">
+                                <div 
+                                    className={`h-2.5 rounded-full ${percentAchieved >= 100 ? 'bg-green-500' : percentAchieved >= 50 ? 'bg-yellow-400' : 'bg-rose-500'}`} 
+                                    style={{ width: `${percentAchieved}%` }}
+                                ></div>
+                           </div>
+                      </div>
+                  </div>
+
+                  {/* Card Footer */}
+                  <div className="bg-gray-50 px-5 py-3 flex justify-between items-center border-t border-gray-100">
+                      <div className="flex items-center text-sm text-gray-600">
+                          <DollarSign size={14} className="mr-1 text-green-600" /> 
+                          Salary: <span className="font-semibold ml-1">₹{(staff.salary || 0).toLocaleString()}</span>
+                      </div>
+                      <div>
+                           {staff.active ? 
+                              <span className="flex items-center text-green-600 text-xs font-medium"><CheckCircle size={14} className="mr-1"/> Active</span> : 
+                              <span className="flex items-center text-red-500 text-xs font-medium"><XCircle size={14} className="mr-1"/> Inactive</span>
+                           }
+                      </div>
+                  </div>
+              </div>
+             )
+        })}
+      </div>
+
+      <Modal isOpen={isModalOpen} onClose={closeModal} title={editingStaff ? "Edit Staff" : "Add New Staff"}>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Name</label>
+            <input 
+              type="text" 
+              required 
+              value={name} 
+              onChange={e => setName(e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-rose-500 focus:ring-rose-500 sm:text-sm border p-2"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Role</label>
+            <select 
+              value={role} 
+              onChange={e => setRole(e.target.value as Role)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-rose-500 focus:ring-rose-500 sm:text-sm border p-2"
+            >
+              {Object.values(Role).map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Specialties (comma separated)</label>
+            <input 
+              type="text" 
+              value={specialties} 
+              onChange={e => setSpecialties(e.target.value)}
+              placeholder="e.g. Cuts, Color, Styling"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-rose-500 focus:ring-rose-500 sm:text-sm border p-2"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+               <div>
+                  <label className="block text-sm font-medium text-gray-700">Monthly Target (₹)</label>
+                  <input 
+                    type="number" 
+                    value={target} 
+                    onChange={e => setTarget(Number(e.target.value))}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-rose-500 focus:ring-rose-500 sm:text-sm border p-2"
+                  />
+               </div>
+               <div>
+                  <label className="block text-sm font-medium text-gray-700">Salary (₹)</label>
+                  <input 
+                    type="number" 
+                    value={salary} 
+                    onChange={e => setSalary(Number(e.target.value))}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-rose-500 focus:ring-rose-500 sm:text-sm border p-2"
+                  />
+               </div>
+          </div>
+          <div className="mt-5 sm:mt-6">
+            <button
+              type="submit"
+              className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-rose-600 text-base font-medium text-white hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-500 sm:text-sm"
+            >
+              Save
+            </button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
+};
+
+export default Staff;
