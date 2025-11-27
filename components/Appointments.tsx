@@ -2,8 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import { db, createNotification, exportToCSV } from '../services/db';
 import { Appointment, Staff, Customer, AppointmentStatus } from '../types';
-import { Plus, Clock, Scissors, Download, X } from 'lucide-react';
+import { Plus, Clock, Scissors, Download, X, FileText } from 'lucide-react';
 import Modal from './ui/Modal';
+import { jsPDF } from 'jspdf';
 
 const Appointments: React.FC = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -78,6 +79,83 @@ const Appointments: React.FC = () => {
       setFilterStartDate('');
       setFilterEndDate('');
       setFilterStatus('');
+  };
+
+  const generateBill = (appt: Appointment) => {
+    const customer = customers.find(c => c.id === appt.customerId);
+    const stylist = staff.find(s => s.id === appt.staffId);
+
+    if (!customer || !stylist) {
+        alert("Missing customer or staff data for this appointment.");
+        return;
+    }
+
+    const doc = new jsPDF();
+
+    // Branding
+    doc.setFontSize(22);
+    doc.setTextColor(225, 29, 72); // Rose-600
+    doc.text('The London Salon', 20, 20);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text('123 High Street, London, UK', 20, 26);
+    doc.text('Phone: +44 20 7946 0123', 20, 31);
+
+    // Invoice Details
+    doc.setFontSize(16);
+    doc.setTextColor(0);
+    doc.text('INVOICE', 140, 20);
+    
+    doc.setFontSize(10);
+    doc.text(`Invoice No: #${appt.id.slice(0, 8).toUpperCase()}`, 140, 28);
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, 140, 33);
+    
+    // Line Separator
+    doc.setDrawColor(200);
+    doc.line(20, 40, 190, 40);
+
+    // Bill To
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text('Bill To:', 20, 50);
+    
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text(customer.name, 20, 56);
+    doc.text(customer.phone, 20, 61);
+    if(customer.apartment) doc.text(customer.apartment, 20, 66);
+
+    // Service Details Header
+    doc.setFillColor(245, 245, 245);
+    doc.rect(20, 80, 170, 10, 'F');
+    doc.setFont("helvetica", "bold");
+    doc.text('Service Description', 25, 87);
+    doc.text('Stylist', 110, 87);
+    doc.text('Amount', 170, 87, { align: 'right' });
+
+    // Item
+    doc.setFont("helvetica", "normal");
+    doc.text(appt.serviceName, 25, 100);
+    doc.text(stylist.name, 110, 100);
+    doc.text(`£${appt.price.toFixed(2)}`, 170, 100, { align: 'right' });
+
+    // Line
+    doc.line(20, 110, 190, 110);
+
+    // Total
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.text('Total:', 140, 125);
+    doc.text(`£${appt.price.toFixed(2)}`, 170, 125, { align: 'right' });
+
+    // Footer
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text('Thank you for your business!', 105, 150, { align: 'center' });
+
+    doc.save(`Invoice_${customer.name.replace(/\s+/g, '_')}_${appt.date}.pdf`);
   };
 
   // Filter & Sort
@@ -197,6 +275,13 @@ const Appointments: React.FC = () => {
                         >
                             {Object.values(AppointmentStatus).map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
+                        <button 
+                          onClick={() => generateBill(appt)}
+                          className="p-2 text-gray-500 hover:text-indigo-600 border border-gray-200 rounded-full hover:bg-gray-50"
+                          title="Create Bill / PDF"
+                        >
+                            <FileText size={18} />
+                        </button>
                     </div>
                 </div>
             );

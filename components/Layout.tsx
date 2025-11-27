@@ -14,9 +14,11 @@ import {
   Crown,
   BarChart2,
   Bell,
-  Tags
+  Tags,
+  LogOut
 } from 'lucide-react';
 import { db, createNotification } from '../services/db';
+import { authService } from '../services/auth';
 import { Notification } from '../types';
 
 interface LayoutProps {
@@ -26,11 +28,18 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [user, setUser] = useState(authService.getCurrentUser());
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Check for notifications periodically
+  // Check for notifications periodically and update user state
   useEffect(() => {
+    // Refresh user state on navigation (e.g. after login)
+    setUser(authService.getCurrentUser());
+
+    // Skip notification/system checks if on login page
+    if (location.pathname === '/login') return;
+
     const checkNotifications = () => {
       const all = db.notifications.getAll();
       setUnreadCount(all.filter(n => !n.read).length);
@@ -77,9 +86,24 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
     runSystemChecks();
     // In a real app, you might poll or use websockets.
-    const interval = setInterval(checkNotifications, 5000); 
+    const interval = setInterval(() => {
+        checkNotifications();
+        // We could run system checks periodically too, but maybe less often
+    }, 5000); 
+    
     return () => clearInterval(interval);
   }, [location.pathname]); // Re-run when changing pages to ensure counts update
+
+  // If we are on the login page, render just the children without layout
+  // IMPORTANT: This must be AFTER all hooks are declared to avoid React Error #300
+  if (location.pathname === '/login') {
+      return <>{children}</>;
+  }
+
+  const handleLogout = () => {
+      authService.logout();
+      navigate('/login');
+  };
 
   const navItems = [
     { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -122,14 +146,23 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           ))}
         </nav>
         <div className="p-4 border-t border-gray-100">
-          <div className="flex items-center">
-            <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 font-bold">
-              A
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+                <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 font-bold">
+                {user?.name?.charAt(0) || 'A'}
+                </div>
+                <div className="ml-3">
+                <p className="text-sm font-medium text-gray-900">{user?.name || 'User'}</p>
+                <p className="text-xs text-gray-500">{user?.role || 'Staff'}</p>
+                </div>
             </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-900">Admin User</p>
-              <p className="text-xs text-gray-500">Manager</p>
-            </div>
+            <button 
+                onClick={handleLogout}
+                className="text-gray-400 hover:text-red-600"
+                title="Logout"
+            >
+                <LogOut size={18} />
+            </button>
           </div>
         </div>
       </aside>
@@ -170,6 +203,20 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   </NavLink>
                 ))}
               </nav>
+            </div>
+            <div className="p-4 border-t border-gray-100 flex justify-between items-center">
+                 <div className="flex items-center">
+                    <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 font-bold">
+                        {user?.name?.charAt(0) || 'A'}
+                    </div>
+                    <div className="ml-3">
+                        <p className="text-sm font-medium text-gray-900">{user?.name || 'User'}</p>
+                        <p className="text-xs text-gray-500">{user?.role || 'Staff'}</p>
+                    </div>
+                 </div>
+                 <button onClick={handleLogout} className="text-gray-500 hover:text-red-600">
+                    <LogOut size={20} />
+                 </button>
             </div>
           </div>
         </div>

@@ -7,6 +7,12 @@ export enum Role {
   HouseKeeping = 'House Keeping'
 }
 
+export interface User {
+  username: string;
+  name: string;
+  role: 'Admin' | 'Manager';
+}
+
 export interface Staff {
   id: string;
   name: string;

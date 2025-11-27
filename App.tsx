@@ -12,23 +12,36 @@ import Reports from './components/Reports';
 import Notifications from './components/Notifications';
 import AIAssistant from './components/AIAssistant';
 import Categories from './components/Categories';
+import Login from './components/Login';
+import { authService } from './services/auth';
+
+// Guard component to check if user is logged in
+const ProtectedRoute = ({ children }: { children?: React.ReactNode }) => {
+  if (!authService.isAuthenticated()) {
+    return <Navigate to="/login" replace />;
+  }
+  return <>{children}</>;
+};
 
 const App: React.FC = () => {
   return (
     <MemoryRouter>
       <Layout>
         <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/staff" element={<Staff />} />
-          <Route path="/inventory" element={<Inventory />} />
-          <Route path="/categories" element={<Categories />} />
-          <Route path="/appointments" element={<Appointments />} />
-          <Route path="/sales" element={<Sales />} />
-          <Route path="/customers" element={<Customers />} />
-          <Route path="/memberships" element={<Memberships />} />
-          <Route path="/reports" element={<Reports />} />
-          <Route path="/notifications" element={<Notifications />} />
-          <Route path="/assistant" element={<AIAssistant />} />
+          <Route path="/login" element={<Login />} />
+          
+          <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/staff" element={<ProtectedRoute><Staff /></ProtectedRoute>} />
+          <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
+          <Route path="/categories" element={<ProtectedRoute><Categories /></ProtectedRoute>} />
+          <Route path="/appointments" element={<ProtectedRoute><Appointments /></ProtectedRoute>} />
+          <Route path="/sales" element={<ProtectedRoute><Sales /></ProtectedRoute>} />
+          <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
+          <Route path="/memberships" element={<ProtectedRoute><Memberships /></ProtectedRoute>} />
+          <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+          <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
+          <Route path="/assistant" element={<ProtectedRoute><AIAssistant /></ProtectedRoute>} />
+          
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>
