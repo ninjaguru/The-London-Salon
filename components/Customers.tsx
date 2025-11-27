@@ -168,7 +168,7 @@ const Customers: React.FC = () => {
         
         return hasEvent;
     }).map(c => {
-        const events = [];
+        const events: { type: 'Birthday' | 'Anniversary', date: Date }[] = [];
         const checkDate = (dateStr: string, type: 'Birthday' | 'Anniversary') => {
              if (!dateStr) return;
              const d = new Date(dateStr);

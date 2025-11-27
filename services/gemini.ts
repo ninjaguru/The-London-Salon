@@ -1,4 +1,7 @@
+
 import { GoogleGenAI } from "@google/genai";
+
+declare var process: { env: { API_KEY?: string } };
 
 const apiKey = process.env.API_KEY || '';
 

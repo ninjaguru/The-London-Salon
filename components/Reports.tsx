@@ -331,7 +331,7 @@ const Reports: React.FC = () => {
                       <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={stockValueData} layout="vertical">
                               <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                              <XAxis type="number" prefix="₹" />
+                              <XAxis type="number" tickFormatter={(val) => `₹${val}`} />
                               <YAxis dataKey="name" type="category" width={100} />
                               <Tooltip formatter={(value) => `₹${value}`} />
                               <Bar dataKey="value" fill="#6366f1" radius={[0, 4, 4, 0]} />
