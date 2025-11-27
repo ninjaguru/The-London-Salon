@@ -1,5 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { db, exportToCSV } from '../services/db';
+import { authService } from '../services/auth';
 import { Category } from '../types';
 import { Plus, Edit2, Trash2, Download } from 'lucide-react';
 import Modal from './ui/Modal';
@@ -9,6 +11,9 @@ const Categories: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   
+  const user = authService.getCurrentUser();
+  const isAdmin = user?.role === 'Admin';
+
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
 
@@ -35,6 +40,7 @@ const Categories: React.FC = () => {
   };
 
   const handleDelete = (id: string) => {
+    if (!isAdmin) return;
     if (confirm('Are you sure you want to delete this category?')) {
       const newList = categories.filter(c => c.id !== id);
       setCategories(newList);
@@ -100,7 +106,9 @@ const Categories: React.FC = () => {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <button onClick={() => openModal(category)} className="text-indigo-600 hover:text-indigo-900 mr-3"><Edit2 size={18} /></button>
-                  <button onClick={() => handleDelete(category.id)} className="text-red-600 hover:text-red-900"><Trash2 size={18} /></button>
+                  {isAdmin && (
+                    <button onClick={() => handleDelete(category.id)} className="text-red-600 hover:text-red-900"><Trash2 size={18} /></button>
+                  )}
                 </td>
               </tr>
             ))}

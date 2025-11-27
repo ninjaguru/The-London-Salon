@@ -1,10 +1,15 @@
+
 import React, { useState, useEffect } from 'react';
-import { db } from '../services/db';
+import { db, exportToCSV } from '../services/db';
+import { authService } from '../services/auth';
 import { Notification } from '../types';
-import { Bell, Check, Trash2, Calendar, AlertTriangle, Info, User } from 'lucide-react';
+import { Bell, Check, Trash2, Calendar, AlertTriangle, Info, User, Download } from 'lucide-react';
 
 const Notifications: React.FC = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  const user = authService.getCurrentUser();
+  const isAdmin = user?.role === 'Admin';
 
   useEffect(() => {
     loadNotifications();
@@ -29,6 +34,7 @@ const Notifications: React.FC = () => {
   };
 
   const deleteNotification = (id: string) => {
+    if (!isAdmin) return;
     const updated = notifications.filter(n => n.id !== id);
     setNotifications(updated);
     db.notifications.save(updated);
@@ -57,14 +63,23 @@ const Notifications: React.FC = () => {
              )}
         </div>
         
-        {unreadCount > 0 && (
+        <div className="flex gap-2">
             <button 
-                onClick={markAllAsRead}
-                className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+                onClick={() => exportToCSV(notifications, 'notifications')}
+                className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm"
             >
-                Mark all as read
+                <Download className="w-4 h-4 mr-2" /> Export
             </button>
-        )}
+
+            {unreadCount > 0 && (
+                <button 
+                    onClick={markAllAsRead}
+                    className="text-sm text-indigo-600 hover:text-indigo-800 font-medium px-4 py-2"
+                >
+                    Mark all as read
+                </button>
+            )}
+        </div>
       </div>
 
       <div className="bg-white shadow rounded-lg overflow-hidden divide-y divide-gray-200">
@@ -105,13 +120,15 @@ const Notifications: React.FC = () => {
                                 <Check size={18} />
                             </button>
                         )}
-                        <button 
-                            onClick={() => deleteNotification(notification.id)}
-                            className="text-gray-400 hover:text-red-600"
-                            title="Delete"
-                        >
-                            <Trash2 size={18} />
-                        </button>
+                        {isAdmin && (
+                            <button 
+                                onClick={() => deleteNotification(notification.id)}
+                                className="text-gray-400 hover:text-red-600"
+                                title="Delete"
+                            >
+                                <Trash2 size={18} />
+                            </button>
+                        )}
                     </div>
                 </div>
             ))

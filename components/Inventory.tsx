@@ -1,5 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { db, createNotification, exportToCSV } from '../services/db';
+import { authService } from '../services/auth';
 import { Product, Category } from '../types';
 import { Plus, Edit2, Trash2, AlertTriangle, Download } from 'lucide-react';
 import Modal from './ui/Modal';
@@ -9,6 +11,9 @@ const Inventory: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+
+  const user = authService.getCurrentUser();
+  const isAdmin = user?.role === 'Admin';
 
   // Form State
   const [formData, setFormData] = useState({
@@ -53,6 +58,7 @@ const Inventory: React.FC = () => {
   };
 
   const handleDelete = (id: string) => {
+    if (!isAdmin) return;
     if (confirm('Delete this product?')) {
       const newList = products.filter(p => p.id !== id);
       setProducts(newList);
@@ -119,7 +125,9 @@ const Inventory: React.FC = () => {
                         </div>
                         <div className="flex space-x-2">
                              <button onClick={() => openModal(product)} className="text-gray-400 hover:text-indigo-600"><Edit2 size={16} /></button>
-                             <button onClick={() => handleDelete(product.id)} className="text-gray-400 hover:text-red-600"><Trash2 size={16} /></button>
+                             {isAdmin && (
+                                <button onClick={() => handleDelete(product.id)} className="text-gray-400 hover:text-red-600"><Trash2 size={16} /></button>
+                             )}
                         </div>
                     </div>
                     

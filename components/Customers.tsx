@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { db, exportToCSV } from '../services/db';
-import { Customer, Membership, Sale, Appointment } from '../types';
+import { authService } from '../services/auth';
+import { Customer, Membership, Sale } from '../types';
 import { Plus, Search, Mail, Phone, User, Download, Home, Cake, Heart, Wallet, CreditCard, Gift, Clock, AlertCircle, Crown, History } from 'lucide-react';
 import Modal from './ui/Modal';
 
@@ -16,6 +17,9 @@ const Customers: React.FC = () => {
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [historyCustomer, setHistoryCustomer] = useState<Customer | null>(null);
   const [customerHistory, setCustomerHistory] = useState<Array<{date: string, type: string, details: string, amount: number}>>([]);
+
+  const user = authService.getCurrentUser();
+  const isAdmin = user?.role === 'Admin';
 
   // Form
   const [formData, setFormData] = useState({
@@ -158,8 +162,6 @@ const Customers: React.FC = () => {
             const d = new Date(dateStr);
             // Construct current year date
             const currentYearDate = new Date(today.getFullYear(), d.getMonth(), d.getDate());
-            // If already passed this year, check next year (though 'next 7 days' usually implies immediate future)
-            // Actually, for next 7 days, we just need to see if currentYearDate is between today and nextWeek
             return currentYearDate >= today && currentYearDate <= nextWeek;
         };
 
@@ -276,13 +278,15 @@ const Customers: React.FC = () => {
                         <p className="text-xs text-gray-500 uppercase font-semibold">Wallet Balance</p>
                         <p className="text-xl font-bold text-gray-900">₹{customer.walletBalance.toLocaleString()}</p>
                     </div>
-                    <button 
-                        onClick={(e) => { e.stopPropagation(); openWalletModal(customer); }}
-                        className="bg-white border border-gray-300 p-2 rounded-full hover:bg-gray-50 text-green-600 z-10"
-                        title="Top Up Wallet"
-                    >
-                        <Wallet size={18} />
-                    </button>
+                    {isAdmin && (
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); openWalletModal(customer); }}
+                            className="bg-white border border-gray-300 p-2 rounded-full hover:bg-gray-50 text-green-600 z-10"
+                            title="Top Up Wallet"
+                        >
+                            <Wallet size={18} />
+                        </button>
+                    )}
                     {membership && (
                          <div className="absolute right-14 top-2 opacity-10">
                              <Crown size={40} />
@@ -362,15 +366,16 @@ const Customers: React.FC = () => {
             </div>
             <div className="grid grid-cols-2 gap-4">
                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Birthday (Date & Month)</label>
+                    <label className="block text-sm font-medium text-gray-700">Birthday</label>
                     <input type="date" value={formData.birthday} onChange={e => setFormData({...formData, birthday: e.target.value})} className="mt-1 block w-full border p-2 rounded-md border-gray-300" />
+                    <p className="text-[10px] text-gray-400 mt-1">Day & Month only</p>
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-gray-700">Anniversary (Date & Month)</label>
+                    <label className="block text-sm font-medium text-gray-700">Anniversary</label>
                     <input type="date" value={formData.anniversary} onChange={e => setFormData({...formData, anniversary: e.target.value})} className="mt-1 block w-full border p-2 rounded-md border-gray-300" />
+                    <p className="text-[10px] text-gray-400 mt-1">Day & Month only</p>
                 </div>
             </div>
-            <p className="text-xs text-gray-500 italic">Year is optional/ignored for celebrations logic.</p>
             <div className="mt-5 sm:mt-6">
                 <button type="submit" className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-rose-600 text-base font-medium text-white hover:bg-rose-700">
                   Save Client

@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { db, exportToCSV } from '../services/db';
+import { authService } from '../services/auth';
 import { Staff as StaffType, Role, AppointmentStatus, Appointment } from '../types';
-import { Plus, Edit2, Trash2, CheckCircle, XCircle, Download, Target, DollarSign, TrendingUp } from 'lucide-react';
+import { Plus, Edit2, Trash2, CheckCircle, XCircle, Download, Target, DollarSign } from 'lucide-react';
 import Modal from './ui/Modal';
 
 const Staff: React.FC = () => {
@@ -10,6 +11,9 @@ const Staff: React.FC = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<StaffType | null>(null);
+
+  const user = authService.getCurrentUser();
+  const isAdmin = user?.role === 'Admin';
 
   // Form State
   const [name, setName] = useState('');
@@ -28,12 +32,16 @@ const Staff: React.FC = () => {
     const specs = specialties.split(',').map(s => s.trim()).filter(Boolean);
     
     let newList;
+    // If not admin, preserve existing target/salary when editing
+    const existingTarget = editingStaff?.target || 0;
+    const existingSalary = editingStaff?.salary || 0;
+
     const staffData = {
         name,
         role,
         specialties: specs,
-        target,
-        salary,
+        target: isAdmin ? target : existingTarget,
+        salary: isAdmin ? salary : existingSalary,
     };
 
     if (editingStaff) {
@@ -53,6 +61,7 @@ const Staff: React.FC = () => {
   };
 
   const handleDelete = (id: string) => {
+    if (!isAdmin) return;
     if (confirm('Are you sure you want to delete this staff member?')) {
       const newList = staffList.filter(s => s.id !== id);
       setStaffList(newList);
@@ -142,7 +151,9 @@ const Staff: React.FC = () => {
                       </div>
                       <div className="flex space-x-1">
                           <button onClick={() => openModal(staff)} className="text-gray-400 hover:text-indigo-600 p-1"><Edit2 size={16} /></button>
-                          <button onClick={() => handleDelete(staff.id)} className="text-gray-400 hover:text-red-600 p-1"><Trash2 size={16} /></button>
+                          {isAdmin && (
+                            <button onClick={() => handleDelete(staff.id)} className="text-gray-400 hover:text-red-600 p-1"><Trash2 size={16} /></button>
+                          )}
                       </div>
                   </div>
 
@@ -159,8 +170,9 @@ const Staff: React.FC = () => {
                           </div>
                       </div>
                       
-                      {/* Monthly Target Section */}
-                      <div>
+                      {/* Monthly Target Section - Only show if Admin or if logged in user matches (not implemented here, showing generally) or just hide for non-admins if sensitive */}
+                      {isAdmin && (
+                        <div>
                            <div className="flex justify-between items-end mb-1">
                                 <p className="text-xs text-gray-500 uppercase font-semibold flex items-center">
                                     <Target size={12} className="mr-1"/> Monthly Target
@@ -175,14 +187,19 @@ const Staff: React.FC = () => {
                                     style={{ width: `${percentAchieved}%` }}
                                 ></div>
                            </div>
-                      </div>
+                        </div>
+                      )}
                   </div>
 
                   {/* Card Footer */}
                   <div className="bg-gray-50 px-5 py-3 flex justify-between items-center border-t border-gray-100">
                       <div className="flex items-center text-sm text-gray-600">
-                          <DollarSign size={14} className="mr-1 text-green-600" /> 
-                          Salary: <span className="font-semibold ml-1">₹{(staff.salary || 0).toLocaleString()}</span>
+                          {isAdmin && (
+                            <>
+                              <DollarSign size={14} className="mr-1 text-green-600" /> 
+                              Salary: <span className="font-semibold ml-1">₹{(staff.salary || 0).toLocaleString()}</span>
+                            </>
+                          )}
                       </div>
                       <div>
                            {staff.active ? 
@@ -228,26 +245,28 @@ const Staff: React.FC = () => {
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-rose-500 focus:ring-rose-500 sm:text-sm border p-2"
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
-               <div>
-                  <label className="block text-sm font-medium text-gray-700">Monthly Target (₹)</label>
-                  <input 
-                    type="number" 
-                    value={target} 
-                    onChange={e => setTarget(Number(e.target.value))}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-rose-500 focus:ring-rose-500 sm:text-sm border p-2"
-                  />
-               </div>
-               <div>
-                  <label className="block text-sm font-medium text-gray-700">Salary (₹)</label>
-                  <input 
-                    type="number" 
-                    value={salary} 
-                    onChange={e => setSalary(Number(e.target.value))}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-rose-500 focus:ring-rose-500 sm:text-sm border p-2"
-                  />
-               </div>
-          </div>
+          {isAdmin && (
+            <div className="grid grid-cols-2 gap-4">
+                 <div>
+                    <label className="block text-sm font-medium text-gray-700">Monthly Target (₹)</label>
+                    <input 
+                      type="number" 
+                      value={target} 
+                      onChange={e => setTarget(Number(e.target.value))}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-rose-500 focus:ring-rose-500 sm:text-sm border p-2"
+                    />
+                 </div>
+                 <div>
+                    <label className="block text-sm font-medium text-gray-700">Salary (₹)</label>
+                    <input 
+                      type="number" 
+                      value={salary} 
+                      onChange={e => setSalary(Number(e.target.value))}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-rose-500 focus:ring-rose-500 sm:text-sm border p-2"
+                    />
+                 </div>
+            </div>
+          )}
           <div className="mt-5 sm:mt-6">
             <button
               type="submit"
