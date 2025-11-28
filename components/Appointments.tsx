@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { db, createNotification, exportToCSV } from '../services/db';
-import { Appointment, Staff, Customer, AppointmentStatus } from '../types';
+import { Appointment, Staff, Customer, AppointmentStatus, Service } from '../types';
 import { Plus, Clock, Scissors, Download, X, FileText } from 'lucide-react';
 import Modal from './ui/Modal';
 import { jsPDF } from 'jspdf';
@@ -10,6 +10,7 @@ const Appointments: React.FC = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Filters State - Default: 1st of current month to Today
@@ -26,13 +27,21 @@ const Appointments: React.FC = () => {
 
   // Form
   const [formData, setFormData] = useState({
-    customerId: '', staffId: '', serviceName: '', date: new Date().toISOString().split('T')[0], time: '10:00', durationMin: 60, price: 0
+    customerId: '', 
+    staffId: '', 
+    serviceId: '',
+    serviceName: '', 
+    date: new Date().toISOString().split('T')[0], 
+    time: '10:00', 
+    durationMin: 60, 
+    price: 0
   });
 
   useEffect(() => {
     setAppointments(db.appointments.getAll());
     setStaff(db.staff.getAll());
     setCustomers(db.customers.getAll());
+    setServices(db.services.getAll());
   }, []);
 
   const handleStatusChange = (id: string, newStatus: AppointmentStatus) => {
@@ -72,6 +81,24 @@ const Appointments: React.FC = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleServiceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const serviceId = e.target.value;
+      const selectedService = services.find(s => s.id === serviceId);
+      
+      if (selectedService) {
+          setFormData({
+              ...formData,
+              serviceId: serviceId,
+              serviceName: selectedService.name,
+              price: selectedService.offerPrice || selectedService.price,
+              durationMin: selectedService.durationMin
+          });
+      } else {
+          // Reset or allow manual entry if "Other" logic exists (keeping simple for now)
+          setFormData({ ...formData, serviceId: '', serviceName: '', price: 0, durationMin: 60 });
+      }
   };
 
   const clearFilters = () => {
@@ -310,7 +337,18 @@ const Appointments: React.FC = () => {
                 </select>
             </div>
             <div>
-                <label className="block text-sm font-medium text-gray-700">Service</label>
+                <label className="block text-sm font-medium text-gray-700">Select Service</label>
+                <select name="serviceId" value={formData.serviceId} onChange={handleServiceChange} className="mt-1 block w-full border p-2 rounded-md border-gray-300">
+                    <option value="">-- Choose Service --</option>
+                    {services.map(s => (
+                        <option key={s.id} value={s.id}>
+                            {s.name} ({s.gender}) - ₹{s.offerPrice || s.price}
+                        </option>
+                    ))}
+                </select>
+            </div>
+            <div>
+                <label className="block text-sm font-medium text-gray-700">Service Name (Manual Override)</label>
                 <input name="serviceName" type="text" required value={formData.serviceName} onChange={handleChange} placeholder="e.g. Haircut" className="mt-1 block w-full border p-2 rounded-md border-gray-300" />
             </div>
             <div className="grid grid-cols-2 gap-4">

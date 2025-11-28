@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
@@ -12,6 +13,7 @@ import Reports from './components/Reports';
 import Notifications from './components/Notifications';
 import AIAssistant from './components/AIAssistant';
 import Categories from './components/Categories';
+import Services from './components/Services';
 import Login from './components/Login';
 import { authService } from './services/auth';
 
@@ -34,6 +36,7 @@ const App: React.FC = () => {
           <Route path="/staff" element={<ProtectedRoute><Staff /></ProtectedRoute>} />
           <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
           <Route path="/categories" element={<ProtectedRoute><Categories /></ProtectedRoute>} />
+          <Route path="/services" element={<ProtectedRoute><Services /></ProtectedRoute>} />
           <Route path="/appointments" element={<ProtectedRoute><Appointments /></ProtectedRoute>} />
           <Route path="/sales" element={<ProtectedRoute><Sales /></ProtectedRoute>} />
           <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />

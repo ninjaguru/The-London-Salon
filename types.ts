@@ -29,6 +29,19 @@ export interface Category {
   description?: string;
 }
 
+export type GenderTarget = 'Men' | 'Women' | 'Unisex';
+
+export interface Service {
+  id: string;
+  name: string;
+  categoryId: string; // Links to Category ID
+  price: number;
+  offerPrice?: number;
+  gender: GenderTarget;
+  durationMin: number;
+  description?: string;
+}
+
 export interface Product {
   id: string;
   name: string;

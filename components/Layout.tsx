@@ -15,7 +15,8 @@ import {
   BarChart2,
   Bell,
   Tags,
-  LogOut
+  LogOut,
+  Sparkle
 } from 'lucide-react';
 import { db, createNotification } from '../services/db';
 import { authService } from '../services/auth';
@@ -110,6 +111,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { to: '/appointments', icon: Calendar, label: 'Appointments' },
     { to: '/customers', icon: Users, label: 'Customers' },
     { to: '/staff', icon: Scissors, label: 'Staff' },
+    { to: '/services', icon: Sparkle, label: 'Services' },
     { to: '/inventory', icon: ShoppingBag, label: 'Inventory' },
     { to: '/categories', icon: Tags, label: 'Categories' },
     { to: '/sales', icon: CreditCard, label: 'Sales' },

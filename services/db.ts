@@ -1,6 +1,6 @@
 
 import { 
-  Staff, Product, Customer, Appointment, Sale, Membership, Notification, Category,
+  Staff, Product, Customer, Appointment, Sale, Membership, Notification, Category, Service,
   Role, AppointmentStatus 
 } from '../types';
 
@@ -13,9 +13,17 @@ const INITIAL_STAFF: Staff[] = [
 ];
 
 const INITIAL_CATEGORIES: Category[] = [
-  { id: '1', name: 'Hair Care', description: 'Shampoos, Conditioners, and Treatments' },
-  { id: '2', name: 'Styling', description: 'Gels, Sprays, and Mousse' },
-  { id: '3', name: 'Tools', description: 'Brushes, Combs, and Accessories' }
+  { id: '1', name: 'Hair Care', description: 'Cuts, Color, and Styling' },
+  { id: '2', name: 'Skin Care', description: 'Facials and Treatments' },
+  { id: '3', name: 'Massage', description: 'Body relaxation therapies' }
+];
+
+const INITIAL_SERVICES: Service[] = [
+  { id: '1', name: 'Men\'s Classic Cut', categoryId: '1', price: 500, offerPrice: 450, gender: 'Men', durationMin: 30, description: 'Standard haircut with wash' },
+  { id: '2', name: 'Women\'s Style Cut', categoryId: '1', price: 1200, gender: 'Women', durationMin: 60, description: 'Layered cut with blow dry' },
+  { id: '3', name: 'Root Touch Up', categoryId: '1', price: 1500, gender: 'Women', durationMin: 90 },
+  { id: '4', name: 'Gold Facial', categoryId: '2', price: 2500, offerPrice: 2000, gender: 'Unisex', durationMin: 60, description: 'Radiance boosting facial' },
+  { id: '5', name: 'Deep Tissue Massage', categoryId: '3', price: 3000, gender: 'Unisex', durationMin: 60 },
 ];
 
 const INITIAL_PRODUCTS: Product[] = [
@@ -145,6 +153,7 @@ class StorageService<T> {
 export const db = {
   staff: new StorageService<Staff>('salon_staff_v2', INITIAL_STAFF),
   categories: new StorageService<Category>('salon_categories', INITIAL_CATEGORIES),
+  services: new StorageService<Service>('salon_services', INITIAL_SERVICES),
   inventory: new StorageService<Product>('salon_inventory', INITIAL_PRODUCTS),
   customers: new StorageService<Customer>('salon_customers_v3', INITIAL_CUSTOMERS),
   memberships: new StorageService<Membership>('salon_memberships_v3', INITIAL_MEMBERSHIPS),
