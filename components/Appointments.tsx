@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { db, createNotification, exportToCSV } from '../services/db';
+import { db, createNotification, exportToCSV, getTodayIST } from '../services/db';
 import { Appointment, Staff, Customer, AppointmentStatus, Service, Category } from '../types';
 import { Plus, Clock, Scissors, Download, X, FileText, Search, User, Phone, Check, Tag, ChevronDown, Calendar as CalendarIcon, DollarSign } from 'lucide-react';
 import Modal from './ui/Modal';
@@ -20,16 +20,16 @@ const Appointments: React.FC = () => {
   const [serviceSearch, setServiceSearch] = useState('');
   const [showServiceList, setShowServiceList] = useState(false);
 
-  // Filters State - Default: 1st of current month to Today
+  // Filters State - Default: 1st of current month to Today (IST)
   const getFirstDayOfMonth = () => {
-      const date = new Date();
-      return new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
+      const today = getTodayIST();
+      const [year, month] = today.split('-');
+      return `${year}-${month}-01`;
   };
-  const getToday = () => new Date().toISOString().split('T')[0];
 
   const [filterStaff, setFilterStaff] = useState('');
   const [filterStartDate, setFilterStartDate] = useState(getFirstDayOfMonth());
-  const [filterEndDate, setFilterEndDate] = useState(getToday());
+  const [filterEndDate, setFilterEndDate] = useState(getTodayIST());
   const [filterStatus, setFilterStatus] = useState('');
 
   // Form
@@ -38,7 +38,7 @@ const Appointments: React.FC = () => {
     staffId: '', 
     serviceId: '',
     serviceName: '', 
-    date: new Date().toISOString().split('T')[0], 
+    date: getTodayIST(), 
     time: '10:00', 
     durationMin: 60, 
     price: 0
@@ -64,7 +64,7 @@ const Appointments: React.FC = () => {
         staffId: '', 
         serviceId: '',
         serviceName: '', 
-        date: new Date().toISOString().split('T')[0], 
+        date: getTodayIST(), 
         time: '10:00', 
         durationMin: 60, 
         price: 0

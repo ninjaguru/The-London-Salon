@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { db, exportToCSV } from '../services/db';
+import { db, exportToCSV, getTodayIST } from '../services/db';
 import { Sale, Product, Customer } from '../types';
 import { Plus, Receipt, Download, X } from 'lucide-react';
 import Modal from './ui/Modal';
@@ -11,15 +11,15 @@ const Sales: React.FC = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Filters State - Default: 1st of current month to Today
+  // Filters State - Default: 1st of current month to Today (IST)
   const getFirstDayOfMonth = () => {
-      const date = new Date();
-      return new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
+      const today = getTodayIST();
+      const [year, month] = today.split('-');
+      return `${year}-${month}-01`;
   };
-  const getToday = () => new Date().toISOString().split('T')[0];
 
   const [filterStartDate, setFilterStartDate] = useState(getFirstDayOfMonth());
-  const [filterEndDate, setFilterEndDate] = useState(getToday());
+  const [filterEndDate, setFilterEndDate] = useState(getTodayIST());
   const [filterProduct, setFilterProduct] = useState('');
 
   // New Sale Form State

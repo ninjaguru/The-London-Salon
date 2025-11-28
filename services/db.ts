@@ -118,6 +118,12 @@ export const createNotification = (
   db.notifications.add(newNotification);
 };
 
+// Helper: Get Current Date in IST (YYYY-MM-DD)
+export const getTodayIST = (): string => {
+  // Returns YYYY-MM-DD in Asia/Kolkata timezone
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+};
+
 // Helper to export data to CSV
 export const exportToCSV = (data: any[], filename: string) => {
   if (!data || !data.length) {
@@ -145,7 +151,7 @@ export const exportToCSV = (data: any[], filename: string) => {
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
-  link.setAttribute('download', `${filename}_${new Date().toISOString().slice(0,10)}.csv`);
+  link.setAttribute('download', `${filename}_${getTodayIST()}.csv`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);

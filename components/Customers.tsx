@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { db, exportToCSV } from '../services/db';
+import { db, exportToCSV, getTodayIST } from '../services/db';
 import { authService } from '../services/auth';
 import { Customer, Membership, Sale } from '../types';
 import { Plus, Search, Mail, Phone, User, Download, Home, Cake, Heart, Wallet, CreditCard, Gift, Clock, AlertCircle, Crown, History } from 'lucide-react';
@@ -131,7 +131,7 @@ const Customers: React.FC = () => {
           id: crypto.randomUUID(),
           ...finalData,
           walletBalance: 0,
-          joinDate: new Date().toISOString().split('T')[0]
+          joinDate: getTodayIST()
         };
         updated = [...customers, newCustomer];
     }

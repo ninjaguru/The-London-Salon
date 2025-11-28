@@ -4,7 +4,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   PieChart, Pie, Cell, LineChart, Line, Legend
 } from 'recharts';
-import { db, exportToCSV } from '../services/db';
+import { db, exportToCSV, getTodayIST } from '../services/db';
 import { Download, Calendar } from 'lucide-react';
 
 const COLORS = ['#e11d48', '#8b5cf6', '#f59e0b', '#10b981', '#3b82f6'];
@@ -12,15 +12,15 @@ const COLORS = ['#e11d48', '#8b5cf6', '#f59e0b', '#10b981', '#3b82f6'];
 const Reports: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'sales' | 'customers' | 'inventory'>('sales');
   
-  // Date Filters - Default: 1st of current month to Today
+  // Date Filters - Default: 1st of current month to Today (IST)
   const getFirstDayOfMonth = () => {
-      const date = new Date();
-      return new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
+      const today = getTodayIST();
+      const [year, month] = today.split('-');
+      return `${year}-${month}-01`;
   };
-  const getToday = () => new Date().toISOString().split('T')[0];
 
   const [startDate, setStartDate] = useState(getFirstDayOfMonth());
-  const [endDate, setEndDate] = useState(getToday());
+  const [endDate, setEndDate] = useState(getTodayIST());
 
   const allSales = db.sales.getAll();
   const allAppointments = db.appointments.getAll();

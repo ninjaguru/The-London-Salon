@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend
 } from 'recharts';
-import { db } from '../services/db';
+import { db, getTodayIST } from '../services/db';
 import { DollarSign, Calendar, AlertTriangle, Users } from 'lucide-react';
 
 const Dashboard: React.FC = () => {
@@ -34,9 +34,8 @@ const Dashboard: React.FC = () => {
     return () => window.removeEventListener('db-updated', handleDbUpdate);
   }, [refreshData]);
 
-  const today = new Date();
-  const todayStr = today.toISOString().split('T')[0];
-  const currentMonthStr = today.toISOString().slice(0, 7); // YYYY-MM
+  const todayStr = getTodayIST();
+  const currentMonthStr = todayStr.slice(0, 7); // YYYY-MM
 
   // --- KPI CALCULATIONS ---
   
@@ -67,11 +66,12 @@ const Dashboard: React.FC = () => {
 
   // --- CHART DATA PREPARATION ---
 
-  // Date Generator for Last 7 Days
+  // Date Generator for Last 7 Days (IST Based)
   const last7Days = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (6 - i));
-    return d.toISOString().split('T')[0];
+    // Pivot from IST date string
+    const dateObj = new Date(todayStr); // YYYY-MM-DD string creates a UTC midnight date object
+    dateObj.setDate(dateObj.getDate() - (6 - i));
+    return dateObj.toISOString().split('T')[0];
   });
 
   // Chart 1 & 2 Data: Daily Revenue & Visits
