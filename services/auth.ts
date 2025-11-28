@@ -1,8 +1,9 @@
+
 import { User } from '../types';
 
 const USERS: User[] = [
-    { username: 'admin', name: 'Alice Admin', role: 'Admin' },
-    { username: 'manager', name: 'Bob Manager', role: 'Manager' }
+    { username: 'ninja', name: 'System Admin', role: 'Admin' },
+    { username: 'manager', name: 'Salon Manager', role: 'Manager' }
 ];
 
 const AUTH_KEY = 'salon_auth_user';
@@ -12,12 +13,12 @@ export const authService = {
         return new Promise((resolve) => {
             // Simulated delay
             setTimeout(() => {
-                // Hardcoded credentials for demo
-                if (username === 'admin' && password === 'admin123') {
+                // Hardcoded credentials
+                if (username === 'ninja' && password === 'Q1p0w2o9#$') {
                     const user = USERS[0];
                     localStorage.setItem(AUTH_KEY, JSON.stringify(user));
                     resolve(user);
-                } else if (username === 'manager' && password === 'manager123') {
+                } else if (username === 'manager' && password === 'TlsManage#$') {
                     const user = USERS[1];
                     localStorage.setItem(AUTH_KEY, JSON.stringify(user));
                     resolve(user);

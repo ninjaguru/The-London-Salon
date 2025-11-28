@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../services/auth';
@@ -57,7 +58,7 @@ const Login: React.FC = () => {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="focus:ring-rose-500 focus:border-rose-500 block w-full pl-10 sm:text-sm border-gray-300 rounded-md py-2 border"
-                  placeholder="admin"
+                  placeholder="Username"
                 />
               </div>
             </div>
@@ -78,7 +79,7 @@ const Login: React.FC = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="focus:ring-rose-500 focus:border-rose-500 block w-full pl-10 sm:text-sm border-gray-300 rounded-md py-2 border"
-                  placeholder="admin123"
+                  placeholder="Password"
                 />
               </div>
             </div>
@@ -101,12 +102,6 @@ const Login: React.FC = () => {
               >
                 {loading ? 'Signing in...' : 'Sign in'}
               </button>
-            </div>
-            
-            <div className="text-center text-xs text-gray-500 mt-4">
-                <p>Demo Credentials:</p>
-                <p>Admin: admin / admin123</p>
-                <p>Manager: manager / manager123</p>
             </div>
           </form>
         </div>

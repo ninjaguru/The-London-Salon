@@ -1,8 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { db, createNotification, exportToCSV } from '../services/db';
-import { Appointment, Staff, Customer, AppointmentStatus, Service } from '../types';
-import { Plus, Clock, Scissors, Download, X, FileText } from 'lucide-react';
+import { Appointment, Staff, Customer, AppointmentStatus, Service, Category } from '../types';
+import { Plus, Clock, Scissors, Download, X, FileText, Search, User, Phone, Check, Tag } from 'lucide-react';
 import Modal from './ui/Modal';
 import { jsPDF } from 'jspdf';
 
@@ -11,7 +11,14 @@ const Appointments: React.FC = () => {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [services, setServices] = useState<Service[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]); // Added categories
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Type Ahead State
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [showCustomerList, setShowCustomerList] = useState(false);
+  const [serviceSearch, setServiceSearch] = useState('');
+  const [showServiceList, setShowServiceList] = useState(false);
 
   // Filters State - Default: 1st of current month to Today
   const getFirstDayOfMonth = () => {
@@ -42,6 +49,7 @@ const Appointments: React.FC = () => {
     setStaff(db.staff.getAll());
     setCustomers(db.customers.getAll());
     setServices(db.services.getAll());
+    setCategories(db.categories.getAll());
   }, []);
 
   const handleStatusChange = (id: string, newStatus: AppointmentStatus) => {
@@ -50,8 +58,31 @@ const Appointments: React.FC = () => {
     db.appointments.save(updated);
   };
 
+  const openBookModal = () => {
+      setFormData({
+        customerId: '', 
+        staffId: '', 
+        serviceId: '',
+        serviceName: '', 
+        date: new Date().toISOString().split('T')[0], 
+        time: '10:00', 
+        durationMin: 60, 
+        price: 0
+      });
+      setCustomerSearch('');
+      setServiceSearch('');
+      setShowCustomerList(false);
+      setShowServiceList(false);
+      setIsModalOpen(true);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.customerId) {
+        alert("Please select a customer.");
+        return;
+    }
+
     const newAppt: Appointment = {
       id: crypto.randomUUID(),
       ...formData,
@@ -83,23 +114,36 @@ const Appointments: React.FC = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleServiceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-      const serviceId = e.target.value;
-      const selectedService = services.find(s => s.id === serviceId);
-      
-      if (selectedService) {
-          setFormData({
-              ...formData,
-              serviceId: serviceId,
-              serviceName: selectedService.name,
-              price: selectedService.offerPrice || selectedService.price,
-              durationMin: selectedService.durationMin
-          });
-      } else {
-          // Reset or allow manual entry if "Other" logic exists (keeping simple for now)
-          setFormData({ ...formData, serviceId: '', serviceName: '', price: 0, durationMin: 60 });
-      }
+  // --- Type Ahead Logic ---
+
+  const selectCustomer = (customer: Customer) => {
+      setFormData({ ...formData, customerId: customer.id });
+      setCustomerSearch(`${customer.name}`);
+      setShowCustomerList(false);
   };
+
+  const selectService = (service: Service) => {
+      setFormData({
+          ...formData,
+          serviceId: service.id,
+          serviceName: service.name,
+          price: service.offerPrice || service.price,
+          durationMin: service.durationMin
+      });
+      setServiceSearch(service.name);
+      setShowServiceList(false);
+  };
+
+  const getCategoryName = (id: string) => categories.find(c => c.id === id)?.name || '';
+
+  const filteredCustomers = customers.filter(c => 
+      c.name.toLowerCase().includes(customerSearch.toLowerCase()) || 
+      c.phone.includes(customerSearch)
+  );
+
+  const filteredServices = services.filter(s => 
+      s.name.toLowerCase().includes(serviceSearch.toLowerCase())
+  );
 
   const clearFilters = () => {
       setFilterStaff('');
@@ -209,7 +253,7 @@ const Appointments: React.FC = () => {
                 <Download className="w-4 h-4 mr-2" /> Export
             </button>
             <button 
-            onClick={() => setIsModalOpen(true)}
+            onClick={openBookModal}
             className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
             >
             <Plus size={18} /> Book Appointment
@@ -321,14 +365,63 @@ const Appointments: React.FC = () => {
       </div>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="New Appointment">
-        <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-                <label className="block text-sm font-medium text-gray-700">Customer</label>
-                <select name="customerId" required value={formData.customerId} onChange={handleChange} className="mt-1 block w-full border p-2 rounded-md border-gray-300">
-                    <option value="">Select Customer</option>
-                    {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+        <form onSubmit={handleSubmit} className="space-y-4 h-[70vh] overflow-y-auto px-1">
+            {/* Customer Type Ahead */}
+            <div className="relative">
+                <label className="block text-sm font-medium text-gray-700">Select Customer (Name or Phone)</label>
+                <div className="relative mt-1">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Search className="h-4 w-4 text-gray-400" />
+                    </div>
+                    <input 
+                        type="text" 
+                        value={customerSearch}
+                        onChange={(e) => {
+                            setCustomerSearch(e.target.value);
+                            setShowCustomerList(true);
+                            if (formData.customerId) setFormData({...formData, customerId: ''}); // Clear selection on edit
+                        }}
+                        onFocus={() => setShowCustomerList(true)}
+                        placeholder="Search customer..."
+                        className={`block w-full pl-10 pr-3 py-2 border rounded-md shadow-sm focus:ring-rose-500 focus:border-rose-500 sm:text-sm ${!formData.customerId && customerSearch ? 'border-amber-400' : 'border-gray-300'}`}
+                    />
+                    {formData.customerId && (
+                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                            <Check className="h-4 w-4 text-green-500" />
+                        </div>
+                    )}
+                </div>
+                
+                {showCustomerList && customerSearch && (
+                    <div className="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
+                        {filteredCustomers.length > 0 ? (
+                            filteredCustomers.map(c => (
+                                <div 
+                                    key={c.id}
+                                    onClick={() => selectCustomer(c)}
+                                    className="cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-rose-50 flex items-center"
+                                >
+                                    <div className="h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 mr-3">
+                                        <User size={16} />
+                                    </div>
+                                    <div>
+                                        <span className="block font-medium truncate">{c.name}</span>
+                                        <span className="block text-xs text-gray-500 truncate flex items-center">
+                                            <Phone size={10} className="mr-1" /> {c.phone}
+                                        </span>
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="cursor-default select-none relative py-2 pl-3 pr-9 text-gray-500 italic">
+                                No customers found.
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
+
+            {/* Staff Selection (Standard Dropdown) */}
             <div>
                 <label className="block text-sm font-medium text-gray-700">Staff</label>
                 <select name="staffId" required value={formData.staffId} onChange={handleChange} className="mt-1 block w-full border p-2 rounded-md border-gray-300">
@@ -336,17 +429,76 @@ const Appointments: React.FC = () => {
                     {staff.map(s => <option key={s.id} value={s.id}>{s.name} ({s.role})</option>)}
                 </select>
             </div>
-            <div>
+
+            {/* Service Type Ahead */}
+            <div className="relative">
                 <label className="block text-sm font-medium text-gray-700">Select Service</label>
-                <select name="serviceId" value={formData.serviceId} onChange={handleServiceChange} className="mt-1 block w-full border p-2 rounded-md border-gray-300">
-                    <option value="">-- Choose Service --</option>
-                    {services.map(s => (
-                        <option key={s.id} value={s.id}>
-                            {s.name} ({s.gender}) - ₹{s.offerPrice || s.price}
-                        </option>
-                    ))}
-                </select>
+                <div className="relative mt-1">
+                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Search className="h-4 w-4 text-gray-400" />
+                    </div>
+                    <input 
+                        type="text" 
+                        value={serviceSearch}
+                        onChange={(e) => {
+                            setServiceSearch(e.target.value);
+                            setShowServiceList(true);
+                        }}
+                        onFocus={() => setShowServiceList(true)}
+                        placeholder="Search service..."
+                        className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-rose-500 focus:border-rose-500 sm:text-sm"
+                    />
+                </div>
+
+                {showServiceList && (
+                    <div className="absolute z-10 mt-1 w-full bg-white shadow-xl max-h-80 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
+                        {filteredServices.length > 0 ? (
+                            filteredServices.map(s => (
+                                <div 
+                                    key={s.id}
+                                    onClick={() => selectService(s)}
+                                    className="cursor-pointer select-none relative py-3 pl-3 pr-4 hover:bg-rose-50 border-b border-gray-50 last:border-0"
+                                >
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <div className="font-bold text-gray-900">{s.name}</div>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
+                                                    <Tag size={10} className="mr-1"/> {getCategoryName(s.categoryId)}
+                                                </span>
+                                                <span className="text-xs text-gray-500 flex items-center">
+                                                    <Clock size={10} className="mr-1"/> {s.durationMin}m
+                                                </span>
+                                                <span className="text-xs text-gray-500 px-1.5 py-0.5 rounded border border-gray-200">
+                                                    {s.gender}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                             {s.offerPrice ? (
+                                                <div className="flex flex-col items-end">
+                                                    <span className="text-green-600 font-bold">₹{s.offerPrice}</span>
+                                                    <span className="text-gray-400 text-xs line-through">₹{s.price}</span>
+                                                </div>
+                                            ) : (
+                                                <span className="text-gray-900 font-bold">₹{s.price}</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    {s.description && (
+                                        <p className="text-xs text-gray-500 mt-1 line-clamp-1">{s.description}</p>
+                                    )}
+                                </div>
+                            ))
+                        ) : (
+                            <div className="cursor-default select-none relative py-2 pl-3 pr-9 text-gray-500 italic">
+                                No services found.
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
+
             <div>
                 <label className="block text-sm font-medium text-gray-700">Service Name (Manual Override)</label>
                 <input name="serviceName" type="text" required value={formData.serviceName} onChange={handleChange} placeholder="e.g. Haircut" className="mt-1 block w-full border p-2 rounded-md border-gray-300" />
