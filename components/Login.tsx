@@ -33,10 +33,13 @@ const Login: React.FC = () => {
             <img 
               src="/logo.png" 
               alt="The London Salon" 
-              className="mx-auto h-16 w-auto mb-4"
-              onError={(e) => e.currentTarget.style.display = 'none'} 
+              className="mx-auto h-24 w-auto mb-6 object-contain"
+              onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  document.getElementById('login-title')?.classList.remove('hidden');
+              }} 
             />
-            <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
+            <h1 id="login-title" className="text-3xl font-extrabold text-gray-900 tracking-tight hidden">
                 The London Salon
             </h1>
             <h2 className="mt-2 text-center text-sm text-gray-600">

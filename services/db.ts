@@ -3,155 +3,29 @@ import {
   Staff, Product, Customer, Appointment, Sale, Membership, Notification, Category, Service, Lead,
   Role, AppointmentStatus 
 } from '../types';
+import { sheetsService } from './sheets';
 
-// Initial Seed Data
-const INITIAL_STAFF: Staff[] = [
-  { id: '1', name: 'Alice Chen', role: Role.Manager, specialties: ['Management'], active: true, target: 0, salary: 50000 },
-  { id: '2', name: 'Marco Rossi', role: Role.HairStylist, specialties: ['Cutting', 'Styling'], active: true, target: 100000, salary: 35000 },
-  { id: '3', name: 'Sarah Jones', role: Role.Beautician, specialties: ['Facials', 'Waxing'], active: true, target: 80000, salary: 32000 },
-  { id: '4', name: 'David Smith', role: Role.HouseKeeping, specialties: ['Cleaning'], active: true, target: 0, salary: 20000 },
-];
-
-const INITIAL_CATEGORIES: Category[] = [
-  { id: '1', name: 'Hair Care', description: 'Cuts, Color, and Styling' },
-  { id: '2', name: 'Skin Care', description: 'Facials and Treatments' },
-  { id: '3', name: 'Massage', description: 'Body relaxation therapies' }
-];
-
-const INITIAL_SERVICES: Service[] = [
-  { id: '1', name: 'Men\'s Classic Cut', categoryId: '1', price: 500, offerPrice: 450, gender: 'Men', durationMin: 30, description: 'Standard haircut with wash' },
-  { id: '2', name: 'Women\'s Style Cut', categoryId: '1', price: 1200, gender: 'Women', durationMin: 60, description: 'Layered cut with blow dry' },
-  { id: '3', name: 'Root Touch Up', categoryId: '1', price: 1500, gender: 'Women', durationMin: 90 },
-  { id: '4', name: 'Gold Facial', categoryId: '2', price: 2500, offerPrice: 2000, gender: 'Unisex', durationMin: 60, description: 'Radiance boosting facial' },
-  { id: '5', name: 'Deep Tissue Massage', categoryId: '3', price: 3000, gender: 'Unisex', durationMin: 60 },
-];
-
-const INITIAL_PRODUCTS: Product[] = [
-  { id: '1', name: 'Silk Shampoo', brand: 'LuxeLock', quantity: 45, price: 1200, category: 'Hair Care', minThreshold: 10 },
-  { id: '2', name: 'Velvet Conditioner', brand: 'LuxeLock', quantity: 8, price: 1400, category: 'Hair Care', minThreshold: 15 },
-  { id: '3', name: 'Gold Serum', brand: 'ShineCo', quantity: 12, price: 2500, category: 'Hair Care', minThreshold: 5 },
-  { id: '4', name: 'Hairspray Strong', brand: 'HoldIt', quantity: 50, price: 850, category: 'Styling', minThreshold: 10 },
-  { id: '5', name: 'Hair Mask', brand: 'DeepCare', quantity: 2, price: 1800, category: 'Hair Care', minThreshold: 5 },
-];
-
-const INITIAL_MEMBERSHIPS: Membership[] = [
-  { 
-    id: '1', name: 'Silver Wallet', cost: 5000, creditValue: 6000, description: 'Pay ₹5000, get ₹6000 worth of services.',
-    complimentaryServices: ['Free Hair Wash'], validityMonths: 6
-  },
-  { 
-    id: '2', name: 'Gold Wallet', cost: 10000, creditValue: 12500, description: 'Pay ₹10000, get ₹12500 worth of services.',
-    complimentaryServices: ['Free Haircut', 'Free Head Massage'], validityMonths: 12
-  },
-  { 
-    id: '3', name: 'Platinum Wallet', cost: 25000, creditValue: 32000, description: 'Pay ₹25000, get ₹32000 worth of services.',
-    complimentaryServices: ['Free Haircut', 'Free Facial', 'Priority Booking'], validityMonths: 12
-  },
-];
-
-const INITIAL_CUSTOMERS: Customer[] = [
-  { 
-    id: '1', name: 'Emma Watson', email: 'emma@example.com', phone: '9876543210', 
-    apartment: 'Apt 4B, Hyde Park', birthday: '1990-04-15', anniversary: '2015-06-20',
-    walletBalance: 2500, membershipId: '1', joinDate: '2023-01-15',
-    membershipRenewalDate: '2024-01-15'
-  },
-  { 
-    id: '2', name: 'John Doe', email: 'john@example.com', phone: '9876543211', 
-    apartment: 'Villa 12, Palm Springs', birthday: '1985-08-20', anniversary: '',
-    walletBalance: 0, membershipId: undefined, joinDate: '2023-03-20'
-  },
-  { 
-    id: '3', name: 'Jane Smith', email: 'jane@example.com', phone: '9876543212', 
-    apartment: 'Flat 101, City Center', birthday: '1992-12-10', anniversary: '2018-02-14',
-    walletBalance: 500, membershipId: '1', joinDate: '2023-06-10',
-    membershipRenewalDate: '2024-06-10'
-  },
-];
-
-const INITIAL_LEADS: Lead[] = [
-  {
-    id: '1', name: 'Sophie Turner', phone: '9988776655', email: 'sophie@test.com', source: 'Instagram', status: 'New', 
-    createdAt: new Date().toISOString(), 
-    comments: [
-      { id: 'c1', text: 'Inquired about Bridal makeup via DM.', date: new Date().toISOString(), author: 'Admin' }
-    ]
-  },
-  {
-    id: '2', name: 'Mike Ross', phone: '1122334455', source: 'Walk-in', status: 'Contacted', 
-    createdAt: new Date(Date.now() - 86400000).toISOString(),
-    comments: [
-      { id: 'c2', text: 'Walked in asking about men\'s packages. Took a brochure.', date: new Date(Date.now() - 86400000).toISOString(), author: 'Manager' },
-      { id: 'c3', text: 'Called to follow up. He said he will visit next week.', date: new Date().toISOString(), author: 'Admin' }
-    ]
-  },
-  {
-    id: '3', name: 'Rachel Zane', phone: '5566778899', source: 'Referral', status: 'Converted', 
-    createdAt: new Date(Date.now() - 172800000).toISOString(),
-    comments: [
-      { id: 'c4', text: 'Referred by Emma Watson.', date: new Date(Date.now() - 172800000).toISOString(), author: 'Manager' }
-    ]
-  }
-];
-
-const INITIAL_APPOINTMENTS: Appointment[] = [
-  { id: '1', customerId: '1', staffId: '2', serviceName: 'Haircut & Style', date: new Date().toISOString().split('T')[0], time: '10:00', durationMin: 60, status: AppointmentStatus.Scheduled, price: 2000 },
-  { id: '2', customerId: '2', staffId: '3', serviceName: 'Full Color', date: new Date().toISOString().split('T')[0], time: '13:00', durationMin: 120, status: AppointmentStatus.Completed, price: 4500 },
-  // Historical data for reports
-  { id: '3', customerId: '3', staffId: '2', serviceName: 'Haircut', date: new Date(Date.now() - 86400000 * 2).toISOString().split('T')[0], time: '11:00', durationMin: 45, status: AppointmentStatus.Completed, price: 1500 },
-  { id: '4', customerId: '1', staffId: '3', serviceName: 'Highlights', date: new Date(Date.now() - 86400000 * 5).toISOString().split('T')[0], time: '14:00', durationMin: 90, status: AppointmentStatus.Completed, price: 3500 },
-];
-
-const INITIAL_SALES: Sale[] = [
-  { 
-    id: '1', 
-    date: new Date(Date.now() - 86400000).toISOString(), // Yesterday
-    customerId: '1', 
-    items: [{ name: 'Silk Shampoo', price: 1200, quantity: 1, type: 'Product' }], 
-    total: 1200,
-    paymentMethod: 'Cash'
-  },
-  { 
-    id: '2', 
-    date: new Date(Date.now() - 86400000 * 3).toISOString(), 
-    customerId: '2', 
-    items: [
-      { name: 'Gold Serum', price: 2500, quantity: 1, type: 'Product' },
-      { name: 'Velvet Conditioner', price: 1400, quantity: 1, type: 'Product' }
-    ], 
-    total: 3900,
-    paymentMethod: 'Card'
-  }
-];
-
-const INITIAL_NOTIFICATIONS: Notification[] = [
-  {
-    id: '1',
-    type: 'alert',
-    title: 'Low Stock Warning',
-    message: 'Velvet Conditioner is below the minimum threshold (8 left).',
-    date: new Date().toISOString(),
-    read: false,
-    relatedId: '2'
-  },
-  {
-    id: '2',
-    type: 'reminder',
-    title: 'Appointment Reminder',
-    message: 'Reminder sent to Emma Watson for appointment tomorrow at 10:00.',
-    date: new Date().toISOString(),
-    read: true,
-    relatedId: '1'
-  }
-];
+// Initial Seed Data - CLEARED
+const INITIAL_STAFF: Staff[] = [];
+const INITIAL_CATEGORIES: Category[] = [];
+const INITIAL_SERVICES: Service[] = [];
+const INITIAL_PRODUCTS: Product[] = [];
+const INITIAL_MEMBERSHIPS: Membership[] = [];
+const INITIAL_CUSTOMERS: Customer[] = [];
+const INITIAL_LEADS: Lead[] = [];
+const INITIAL_APPOINTMENTS: Appointment[] = [];
+const INITIAL_SALES: Sale[] = [];
+const INITIAL_NOTIFICATIONS: Notification[] = [];
 
 // Helper to manage generic CRUD
 class StorageService<T> {
   private key: string;
+  private tableName: string; // The Google Sheet Tab Name
   private initialData: T[];
 
-  constructor(key: string, initialData: T[]) {
+  constructor(key: string, tableName: string, initialData: T[]) {
     this.key = key;
+    this.tableName = tableName;
     this.initialData = initialData;
   }
 
@@ -166,6 +40,12 @@ class StorageService<T> {
 
   save(data: T[]) {
     localStorage.setItem(this.key, JSON.stringify(data));
+    // Trigger background sync if connected
+    if (sheetsService.isConfigured()) {
+      sheetsService.write(this.tableName, data).then(res => {
+        if (res.status === 'error') console.error(`Sync error for ${this.tableName}:`, res.message);
+      });
+    }
   }
 
   add(item: T) {
@@ -173,19 +53,48 @@ class StorageService<T> {
     all.push(item);
     this.save(all);
   }
+
+  // Used when pulling data FROM cloud
+  overrideLocal(data: T[]) {
+    localStorage.setItem(this.key, JSON.stringify(data));
+  }
 }
 
+// Updated keys to force a clean state
 export const db = {
-  staff: new StorageService<Staff>('salon_staff_v2', INITIAL_STAFF),
-  categories: new StorageService<Category>('salon_categories', INITIAL_CATEGORIES),
-  services: new StorageService<Service>('salon_services', INITIAL_SERVICES),
-  inventory: new StorageService<Product>('salon_inventory', INITIAL_PRODUCTS),
-  customers: new StorageService<Customer>('salon_customers_v3', INITIAL_CUSTOMERS),
-  leads: new StorageService<Lead>('salon_leads', INITIAL_LEADS),
-  memberships: new StorageService<Membership>('salon_memberships_v3', INITIAL_MEMBERSHIPS),
-  appointments: new StorageService<Appointment>('salon_appointments', INITIAL_APPOINTMENTS),
-  sales: new StorageService<Sale>('salon_sales', INITIAL_SALES),
-  notifications: new StorageService<Notification>('salon_notifications', INITIAL_NOTIFICATIONS),
+  staff: new StorageService<Staff>('salon_staff_v4_clean', 'Staff', INITIAL_STAFF),
+  categories: new StorageService<Category>('salon_categories_v4_clean', 'Categories', INITIAL_CATEGORIES),
+  services: new StorageService<Service>('salon_services_v4_clean', 'Services', INITIAL_SERVICES),
+  inventory: new StorageService<Product>('salon_inventory_v4_clean', 'Inventory', INITIAL_PRODUCTS),
+  customers: new StorageService<Customer>('salon_customers_v4_clean', 'Customers', INITIAL_CUSTOMERS),
+  leads: new StorageService<Lead>('salon_leads_v4_clean', 'Leads', INITIAL_LEADS),
+  memberships: new StorageService<Membership>('salon_memberships_v4_clean', 'Memberships', INITIAL_MEMBERSHIPS),
+  appointments: new StorageService<Appointment>('salon_appointments_v4_clean', 'Appointments', INITIAL_APPOINTMENTS),
+  sales: new StorageService<Sale>('salon_sales_v4_clean', 'Sales', INITIAL_SALES),
+  notifications: new StorageService<Notification>('salon_notifications_v4_clean', 'Notifications', INITIAL_NOTIFICATIONS),
+};
+
+// Global Sync Function
+export const syncFromCloud = async (): Promise<{success: boolean, message: string}> => {
+  const result = await sheetsService.readAll();
+  
+  if (result.status === 'success' && result.data) {
+    const data = result.data;
+    if (data.Staff) db.staff.overrideLocal(data.Staff);
+    if (data.Categories) db.categories.overrideLocal(data.Categories);
+    if (data.Services) db.services.overrideLocal(data.Services);
+    if (data.Inventory) db.inventory.overrideLocal(data.Inventory);
+    if (data.Customers) db.customers.overrideLocal(data.Customers);
+    if (data.Leads) db.leads.overrideLocal(data.Leads);
+    if (data.Memberships) db.memberships.overrideLocal(data.Memberships);
+    if (data.Appointments) db.appointments.overrideLocal(data.Appointments);
+    if (data.Sales) db.sales.overrideLocal(data.Sales);
+    if (data.Notifications) db.notifications.overrideLocal(data.Notifications);
+    
+    return { success: true, message: 'Data synced from cloud successfully' };
+  } else {
+    return { success: false, message: result.message || 'Unknown error' };
+  }
 };
 
 // Helper to create a notification easily

@@ -18,11 +18,14 @@ import {
   LogOut,
   Sparkle,
   Target,
-  MapPin
+  MapPin,
+  Settings,
+  Cloud,
+  FileSpreadsheet
 } from 'lucide-react';
 import { db, createNotification } from '../services/db';
 import { authService } from '../services/auth';
-import { Notification } from '../types';
+import { sheetsService } from '../services/sheets';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -32,6 +35,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [user, setUser] = useState(authService.getCurrentUser());
+  const [isCloudConfigured, setIsCloudConfigured] = useState(false);
+  const [sheetViewUrl, setSheetViewUrl] = useState('');
+  
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -39,6 +45,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   useEffect(() => {
     // Refresh user state on navigation (e.g. after login)
     setUser(authService.getCurrentUser());
+    setIsCloudConfigured(sheetsService.isConfigured());
+    setSheetViewUrl(sheetsService.getViewUrl());
 
     // Skip notification/system checks if on login page
     if (location.pathname === '/login') return;
@@ -123,17 +131,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { to: '/assistant', icon: Sparkles, label: 'Smart Assistant', highlight: true },
   ];
 
+  if (user?.role === 'Admin') {
+    navItems.push({ to: '/settings', icon: Settings, label: 'Settings', highlight: false });
+  }
+
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
       {/* Sidebar - Desktop */}
       <aside className="hidden md:flex md:flex-col w-64 bg-white border-r border-gray-200">
-        <div className="flex flex-col items-center justify-center h-24 border-b border-gray-100 p-4">
-          <img src="/logo.png" alt="The London Salon" className="h-10 w-auto mb-2" onError={(e) => {
+        <div className="flex flex-col items-center justify-center min-h-[7rem] border-b border-gray-100 p-4">
+          <img src="/logo.png" alt="The London Salon" className="h-20 w-auto object-contain transition-all duration-300" onError={(e) => {
               // Fallback if logo missing
               e.currentTarget.style.display = 'none';
               e.currentTarget.nextElementSibling?.classList.remove('hidden');
           }}/>
-          <h1 className="text-xl font-bold bg-gradient-to-r from-rose-500 to-purple-600 bg-clip-text text-transparent hidden">
+          <h1 className="text-xl font-bold bg-gradient-to-r from-rose-500 to-purple-600 bg-clip-text text-transparent hidden text-center mt-2">
             The London Salon
           </h1>
         </div>
@@ -198,11 +210,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </button>
             </div>
             <div className="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
-              <div className="flex-shrink-0 flex items-center px-4 mb-4">
-                 <img src="/logo.png" alt="The London Salon" className="h-8 w-auto mr-2" />
-                 <h1 className="text-xl font-bold text-gray-900">The London Salon</h1>
+              <div className="flex-shrink-0 flex items-center justify-center px-4 mb-4 border-b border-gray-100 pb-4">
+                 <img src="/logo.png" alt="The London Salon" className="h-12 w-auto" />
               </div>
-              <nav className="mt-5 px-2 space-y-1">
+              <nav className="mt-2 px-2 space-y-1">
                 {navItems.map((item) => (
                   <NavLink
                     key={item.to}
@@ -253,6 +264,25 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
           
           <div className="flex items-center space-x-4">
+            {/* View Data Link */}
+            {sheetViewUrl && (
+              <a 
+                href={sheetViewUrl} 
+                target="_blank" 
+                rel="noreferrer"
+                className="hidden md:flex items-center text-gray-600 hover:text-green-600 text-xs font-medium bg-white border border-gray-200 px-3 py-1 rounded-full transition-colors"
+                title="Open Google Sheet"
+              >
+                 <FileSpreadsheet className="w-3 h-3 mr-1.5" /> View Data
+              </a>
+            )}
+
+            {isCloudConfigured && (
+                <div title="Connected to Google Sheets" className="hidden md:flex items-center text-green-600 text-xs font-medium bg-green-50 px-2 py-1 rounded-full">
+                    <Cloud className="w-3 h-3 mr-1" /> Online
+                </div>
+            )}
+
             <button 
                 onClick={() => navigate('/notifications')}
                 className="relative p-2 text-gray-500 hover:text-gray-700 focus:outline-none"

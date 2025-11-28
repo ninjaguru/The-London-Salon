@@ -15,6 +15,7 @@ import Notifications from './components/Notifications';
 import AIAssistant from './components/AIAssistant';
 import Categories from './components/Categories';
 import Services from './components/Services';
+import Settings from './components/Settings';
 import Login from './components/Login';
 import { authService } from './services/auth';
 
@@ -46,6 +47,7 @@ const App: React.FC = () => {
           <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
           <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
           <Route path="/assistant" element={<ProtectedRoute><AIAssistant /></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
