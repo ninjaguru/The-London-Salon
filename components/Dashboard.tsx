@@ -1,4 +1,5 @@
-import React from 'react';
+
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend
 } from 'recharts';
@@ -6,11 +7,32 @@ import { db } from '../services/db';
 import { DollarSign, Calendar, AlertTriangle, Users } from 'lucide-react';
 
 const Dashboard: React.FC = () => {
-  const sales = db.sales.getAll();
-  const appointments = db.appointments.getAll();
-  const inventory = db.inventory.getAll();
-  const customers = db.customers.getAll();
-  const staffList = db.staff.getAll();
+  // Use state to ensure reactivity when DB updates (e.g. from sync)
+  const [sales, setSales] = useState(() => db.sales.getAll());
+  const [appointments, setAppointments] = useState(() => db.appointments.getAll());
+  const [inventory, setInventory] = useState(() => db.inventory.getAll());
+  const [customers, setCustomers] = useState(() => db.customers.getAll());
+  const [staffList, setStaffList] = useState(() => db.staff.getAll());
+
+  // Function to refresh data from local storage
+  const refreshData = useCallback(() => {
+    setSales(db.sales.getAll());
+    setAppointments(db.appointments.getAll());
+    setInventory(db.inventory.getAll());
+    setCustomers(db.customers.getAll());
+    setStaffList(db.staff.getAll());
+  }, []);
+
+  useEffect(() => {
+    // Listen for the custom 'db-updated' event dispatched by db.ts
+    const handleDbUpdate = () => refreshData();
+    window.addEventListener('db-updated', handleDbUpdate);
+    
+    // Also refresh immediately on mount to ensure fresh data
+    refreshData();
+
+    return () => window.removeEventListener('db-updated', handleDbUpdate);
+  }, [refreshData]);
 
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];

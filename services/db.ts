@@ -40,6 +40,7 @@ class StorageService<T> {
 
   save(data: T[]) {
     localStorage.setItem(this.key, JSON.stringify(data));
+    window.dispatchEvent(new Event('db-updated'));
     // Trigger background sync if connected
     if (sheetsService.isConfigured()) {
       sheetsService.write(this.tableName, data).then(res => {
@@ -57,6 +58,7 @@ class StorageService<T> {
   // Used when pulling data FROM cloud
   overrideLocal(data: T[]) {
     localStorage.setItem(this.key, JSON.stringify(data));
+    window.dispatchEvent(new Event('db-updated'));
   }
 }
 
