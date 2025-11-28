@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -41,13 +41,19 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   // Loading State
   const [isGlobalSyncing, setIsGlobalSyncing] = useState(false);
   
+  // Ref to track if we have already synced this session to prevent re-sync on navigation
+  const hasSynced = useRef(false);
+  
   const navigate = useNavigate();
   const location = useLocation();
 
   // Auto-sync on login or app load if user exists
   useEffect(() => {
-    if (user && location.pathname !== '/login') {
+    // Only sync if user is logged in, we haven't synced this session, and we are not on login page
+    if (user && !hasSynced.current && location.pathname !== '/login') {
+       hasSynced.current = true; // Mark as synced immediately
        setIsGlobalSyncing(true);
+       
        // Perform a background sync to get latest data from sheets
        syncFromCloud().then(res => {
          if (res.success) {
@@ -60,12 +66,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
          setTimeout(() => setIsGlobalSyncing(false), 500);
        });
     }
-  }, [user]); // Removed location.pathname to prevent re-syncing on every navigation click
+  }, [user]); 
 
   // Check for notifications periodically and update user state
   useEffect(() => {
     // Refresh user state on navigation (e.g. after login)
-    setUser(authService.getCurrentUser());
+    const currentUser = authService.getCurrentUser();
+    // Only update state if user object actually changed to prevent firing other effects
+    if (JSON.stringify(currentUser) !== JSON.stringify(user)) {
+        setUser(currentUser);
+    }
+    
     setIsCloudConfigured(sheetsService.isConfigured());
     setSheetViewUrl(sheetsService.getViewUrl());
 
@@ -117,23 +128,18 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     };
 
     runSystemChecks();
-    // In a real app, you might poll or use websockets.
+    
     const interval = setInterval(() => {
         checkNotifications();
-        // We could run system checks periodically too, but maybe less often
     }, 5000); 
     
     return () => clearInterval(interval);
-  }, [location.pathname]); // Re-run when changing pages to ensure counts update
+  }, [location.pathname]); 
 
-  // If we are on the login page, render just the children without layout
-  // IMPORTANT: This must be AFTER all hooks are declared to avoid React Error #300
-  if (location.pathname === '/login') {
-      return <>{children}</>;
-  }
-
+  // Handle Logout
   const handleLogout = () => {
       authService.logout();
+      hasSynced.current = false; // Reset sync status so next login triggers a sync
       navigate('/login');
   };
 
@@ -154,6 +160,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   if (user?.role === 'Admin') {
     navItems.push({ to: '/settings', icon: Settings, label: 'Settings', highlight: false });
+  }
+
+  // If we are on the login page, render just the children without layout
+  // IMPORTANT: This must be AFTER all hooks are declared to avoid React Error #300
+  if (location.pathname === '/login') {
+      return <>{children}</>;
   }
 
   return (
