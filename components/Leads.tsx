@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { db, exportToCSV } from '../services/db';
 import { authService } from '../services/auth';
@@ -230,11 +229,16 @@ const Leads: React.FC = () => {
       </div>
 
       {/* Edit/View Modal */}
-      <Modal isOpen={isModalOpen} onClose={closeModal} title={editingLead ? "Manage Lead" : "New Lead"}>
-         <div className="flex flex-col md:flex-row gap-6 h-[70vh]">
+      <Modal 
+        isOpen={isModalOpen} 
+        onClose={closeModal} 
+        title={editingLead ? "Manage Lead" : "New Lead"}
+        maxWidth={editingLead ? "sm:max-w-4xl" : "sm:max-w-lg"}
+      >
+         <div className={`flex flex-col ${editingLead ? 'md:flex-row h-[70vh]' : ''} gap-6`}>
             
             {/* Left: Form */}
-            <div className="flex-1 overflow-y-auto pr-2">
+            <div className={`flex-1 overflow-y-auto pr-2 ${editingLead ? '' : 'max-h-[70vh]'}`}>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium text-gray-700">Name</label>
