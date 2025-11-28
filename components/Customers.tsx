@@ -354,7 +354,7 @@ const Customers: React.FC = () => {
                 
                 <div className="space-y-2 mt-auto">
                     <div className="flex items-center text-gray-600 text-sm">
-                        <Mail size={16} className="mr-2 text-gray-400" /> {customer.email}
+                        <Mail size={16} className="mr-2 text-gray-400" /> {customer.email || <span className="text-gray-400 italic">No email</span>}
                     </div>
                     <div className="flex items-center text-gray-600 text-sm">
                         <Phone size={16} className="mr-2 text-gray-400" /> {customer.phone}
@@ -404,8 +404,8 @@ const Customers: React.FC = () => {
                     <input type="tel" required value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="mt-1 block w-full border p-2 rounded-md border-gray-300" />
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-gray-700">Email</label>
-                    <input type="email" required value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="mt-1 block w-full border p-2 rounded-md border-gray-300" />
+                    <label className="block text-sm font-medium text-gray-700">Email (Optional)</label>
+                    <input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="mt-1 block w-full border p-2 rounded-md border-gray-300" />
                 </div>
             </div>
             <div>

@@ -181,7 +181,7 @@ const Staff: React.FC = () => {
                                     ₹{metrics.revenue.toLocaleString()} / ₹{(staff.target || 0).toLocaleString()}
                                 </span>
                            </div>
-                           <div className="w-full bg-gray-200 rounded-full h-2.5">
+                           <div className="w-full bg-gray-200 rounded-full h-2.5" title={`${percentAchieved.toFixed(0)}% Achieved`}>
                                 <div 
                                     className={`h-2.5 rounded-full ${percentAchieved >= 100 ? 'bg-green-500' : percentAchieved >= 50 ? 'bg-yellow-400' : 'bg-rose-500'}`} 
                                     style={{ width: `${percentAchieved}%` }}
