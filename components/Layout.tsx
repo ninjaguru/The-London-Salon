@@ -17,7 +17,8 @@ import {
   Tags,
   LogOut,
   Sparkle,
-  Target
+  Target,
+  MapPin
 } from 'lucide-react';
 import { db, createNotification } from '../services/db';
 import { authService } from '../services/auth';
@@ -126,8 +127,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     <div className="flex h-screen bg-gray-50 overflow-hidden">
       {/* Sidebar - Desktop */}
       <aside className="hidden md:flex md:flex-col w-64 bg-white border-r border-gray-200">
-        <div className="flex items-center justify-center h-16 border-b border-gray-100">
-          <h1 className="text-xl font-bold bg-gradient-to-r from-rose-500 to-purple-600 bg-clip-text text-transparent">
+        <div className="flex flex-col items-center justify-center h-24 border-b border-gray-100 p-4">
+          <img src="/logo.png" alt="The London Salon" className="h-10 w-auto mb-2" onError={(e) => {
+              // Fallback if logo missing
+              e.currentTarget.style.display = 'none';
+              e.currentTarget.nextElementSibling?.classList.remove('hidden');
+          }}/>
+          <h1 className="text-xl font-bold bg-gradient-to-r from-rose-500 to-purple-600 bg-clip-text text-transparent hidden">
             The London Salon
           </h1>
         </div>
@@ -148,6 +154,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               {item.label}
             </NavLink>
           ))}
+          
+          <div className="mt-6 px-4 py-2 bg-gray-50 mx-2 rounded-md border border-gray-100">
+              <div className="flex items-start text-xs text-gray-500">
+                  <MapPin size={12} className="mt-0.5 mr-1 flex-shrink-0" />
+                  <p>Vibgyor High School Road, Thubarahalli, Whitefield, Bengaluru</p>
+              </div>
+          </div>
         </nav>
         <div className="p-4 border-t border-gray-100">
           <div className="flex items-center justify-between">
@@ -185,8 +198,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </button>
             </div>
             <div className="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
-              <div className="flex-shrink-0 flex items-center px-4">
-                <h1 className="text-xl font-bold text-gray-900">The London Salon</h1>
+              <div className="flex-shrink-0 flex items-center px-4 mb-4">
+                 <img src="/logo.png" alt="The London Salon" className="h-8 w-auto mr-2" />
+                 <h1 className="text-xl font-bold text-gray-900">The London Salon</h1>
               </div>
               <nav className="mt-5 px-2 space-y-1">
                 {navItems.map((item) => (

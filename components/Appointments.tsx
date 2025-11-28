@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db, createNotification, exportToCSV } from '../services/db';
 import { Appointment, Staff, Customer, AppointmentStatus, Service, Category } from '../types';
-import { Plus, Clock, Scissors, Download, X, FileText, Search, User, Phone, Check, Tag, ChevronDown } from 'lucide-react';
+import { Plus, Clock, Scissors, Download, X, FileText, Search, User, Phone, Check, Tag, ChevronDown, Calendar as CalendarIcon, DollarSign } from 'lucide-react';
 import Modal from './ui/Modal';
 import { jsPDF } from 'jspdf';
 
@@ -170,81 +170,134 @@ const Appointments: React.FC = () => {
       setFilterStatus('');
   };
 
-  const generateBill = (appt: Appointment) => {
-    const customer = customers.find(c => c.id === appt.customerId);
-    const stylist = staff.find(s => s.id === appt.staffId);
+  const generateBill = async (customer: Customer, appointmentsToBill: Appointment[]) => {
+    // Filter non-cancelled
+    const items = appointmentsToBill.filter(a => a.status !== AppointmentStatus.Cancelled);
 
-    if (!customer || !stylist) {
-        alert("Missing customer or staff data for this appointment.");
+    if (items.length === 0) {
+        alert("No billable appointments found for this customer in the current view.");
         return;
     }
 
     const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
 
-    // Branding
-    doc.setFontSize(22);
-    doc.setTextColor(225, 29, 72); // Rose-600
-    doc.text('The London Salon', 20, 20);
-    
+    // Helper to add logo if available
+    const loadLogo = (): Promise<HTMLImageElement | null> => {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.src = '/logo.png';
+            img.onload = () => resolve(img);
+            img.onerror = () => resolve(null);
+        });
+    };
+
+    const logo = await loadLogo();
+
+    let yOffset = 20;
+
+    // Header Section
+    if (logo) {
+        doc.addImage(logo, 'PNG', 20, 10, 30, 15); // Adjust aspect ratio as needed
+        yOffset = 30;
+    } else {
+        // Fallback title if logo fails
+        doc.setFontSize(22);
+        doc.setTextColor(225, 29, 72); // Rose-600
+        doc.text('The London Salon', 20, 20);
+        yOffset = 26;
+    }
+
+    // Address
     doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text('123 High Street, London, UK', 20, 26);
-    doc.text('Phone: +44 20 7946 0123', 20, 31);
-
-    // Invoice Details
+    doc.setTextColor(80);
+    doc.text('Vibgyor High School Road, Thubarahalli,', 20, yOffset);
+    doc.text('Whitefield, Bengaluru, Karnataka 560066', 20, yOffset + 5);
+    
+    // Invoice Title
     doc.setFontSize(16);
     doc.setTextColor(0);
-    doc.text('INVOICE', 140, 20);
+    doc.text('INVOICE', pageWidth - 20, 20, { align: 'right' });
     
+    const invoiceDate = new Date().toLocaleDateString();
     doc.setFontSize(10);
-    doc.text(`Invoice No: #${appt.id.slice(0, 8).toUpperCase()}`, 140, 28);
-    doc.text(`Date: ${new Date().toLocaleDateString()}`, 140, 33);
+    doc.text(`Date: ${invoiceDate}`, pageWidth - 20, 28, { align: 'right' });
     
     // Line Separator
     doc.setDrawColor(200);
-    doc.line(20, 40, 190, 40);
+    doc.line(20, yOffset + 15, pageWidth - 20, yOffset + 15);
+    yOffset += 25;
 
     // Bill To
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
-    doc.text('Bill To:', 20, 50);
+    doc.text('Bill To:', 20, yOffset);
     
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
-    doc.text(customer.name, 20, 56);
-    doc.text(customer.phone, 20, 61);
-    if(customer.apartment) doc.text(customer.apartment, 20, 66);
+    doc.text(customer.name, 20, yOffset + 6);
+    doc.text(customer.phone, 20, yOffset + 11);
+    if(customer.apartment) doc.text(customer.apartment, 20, yOffset + 16);
+
+    yOffset += 30;
 
     // Service Details Header
     doc.setFillColor(245, 245, 245);
-    doc.rect(20, 80, 170, 10, 'F');
+    doc.rect(20, yOffset, pageWidth - 40, 10, 'F');
     doc.setFont("helvetica", "bold");
-    doc.text('Service Description', 25, 87);
-    doc.text('Stylist', 110, 87);
-    doc.text('Amount', 170, 87, { align: 'right' });
+    doc.text('Date', 25, yOffset + 7);
+    doc.text('Service', 55, yOffset + 7);
+    doc.text('Stylist', 120, yOffset + 7);
+    doc.text('Amount', pageWidth - 25, yOffset + 7, { align: 'right' });
 
-    // Item
+    // Items Loop
+    yOffset += 15;
+    let totalAmount = 0;
+
     doc.setFont("helvetica", "normal");
-    doc.text(appt.serviceName, 25, 100);
-    doc.text(stylist.name, 110, 100);
-    doc.text(`£${appt.price.toFixed(2)}`, 170, 100, { align: 'right' });
+    
+    // Sort items by Date then Time
+    items.sort((a,b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+
+    items.forEach(item => {
+        const itemStylist = staff.find(s => s.id === item.staffId)?.name || 'Unknown';
+        
+        // Handle long service names
+        const serviceName = item.serviceName.length > 25 
+            ? item.serviceName.substring(0, 22) + '...' 
+            : item.serviceName;
+
+        doc.text(new Date(item.date).toLocaleDateString(), 25, yOffset);
+        doc.text(serviceName, 55, yOffset);
+        doc.text(itemStylist, 120, yOffset);
+        doc.text(`Rs. ${item.price.toFixed(2)}`, pageWidth - 25, yOffset, { align: 'right' });
+        
+        totalAmount += item.price;
+        yOffset += 10;
+        
+        if (yOffset > 270) {
+            doc.addPage();
+            yOffset = 20;
+        }
+    });
 
     // Line
-    doc.line(20, 110, 190, 110);
+    doc.line(20, yOffset, pageWidth - 20, yOffset);
+    yOffset += 10;
 
     // Total
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
-    doc.text('Total:', 140, 125);
-    doc.text(`£${appt.price.toFixed(2)}`, 170, 125, { align: 'right' });
+    doc.text('Total:', 140, yOffset);
+    doc.text(`Rs. ${totalAmount.toFixed(2)}`, pageWidth - 25, yOffset, { align: 'right' });
 
     // Footer
     doc.setFont("helvetica", "italic");
     doc.setFontSize(10);
     doc.setTextColor(100);
-    doc.text('Thank you for your business!', 105, 150, { align: 'center' });
+    doc.text('Thank you for your business!', pageWidth / 2, 280, { align: 'center' });
 
-    doc.save(`Invoice_${customer.name.replace(/\s+/g, '_')}_${appt.date}.pdf`);
+    doc.save(`Invoice_${customer.name.replace(/\s+/g, '_')}_${invoiceDate}.pdf`);
   };
 
   // Filter & Sort
@@ -257,6 +310,19 @@ const Appointments: React.FC = () => {
   }).sort((a, b) => {
       if (a.date !== b.date) return a.date.localeCompare(b.date);
       return a.time.localeCompare(b.time);
+  });
+
+  // Group by Customer ID
+  const groupedAppointments: { [key: string]: { customer: Customer | undefined, appointments: Appointment[] } } = {};
+
+  filteredAppointments.forEach(appt => {
+      if (!groupedAppointments[appt.customerId]) {
+          groupedAppointments[appt.customerId] = {
+              customer: customers.find(c => c.id === appt.customerId),
+              appointments: []
+          };
+      }
+      groupedAppointments[appt.customerId].appointments.push(appt);
   });
 
   return (
@@ -329,56 +395,107 @@ const Appointments: React.FC = () => {
           </button>
       </div>
 
-      <div className="space-y-4">
-        {filteredAppointments.map((appt) => {
-            const client = customers.find(c => c.id === appt.customerId);
-            const stylist = staff.find(s => s.id === appt.staffId);
-            
-            return (
-                <div key={appt.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 flex flex-col md:flex-row justify-between items-start md:items-center">
-                    <div className="flex-1">
-                        <div className="flex items-center gap-4 mb-2">
-                             <div className="bg-rose-100 text-rose-800 text-xs font-bold px-2 py-1 rounded uppercase tracking-wide">
-                                {new Date(appt.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                             </div>
-                             <div className="flex items-center text-gray-600 text-sm">
-                                <Clock size={16} className="mr-1"/> {appt.time} ({appt.durationMin}m)
-                             </div>
-                             <div className="text-gray-500 text-sm font-medium">₹{appt.price}</div>
-                        </div>
-                        <h3 className="text-lg font-bold text-gray-900">{client?.name || 'Unknown Client'}</h3>
-                        <p className="text-gray-500 text-sm flex items-center mt-1">
-                           <Scissors size={14} className="mr-1"/> {appt.serviceName} with <span className="font-medium ml-1">{stylist?.name}</span>
-                        </p>
-                    </div>
-                    
-                    <div className="mt-4 md:mt-0 flex items-center gap-3">
-                        <select 
-                            value={appt.status}
-                            onChange={(e) => handleStatusChange(appt.id, e.target.value as AppointmentStatus)}
-                            className={`text-sm rounded-full px-3 py-1 font-medium border-0 ring-1 ring-inset ${
-                                appt.status === AppointmentStatus.Scheduled ? 'bg-blue-50 text-blue-700 ring-blue-600/20' :
-                                appt.status === AppointmentStatus.Completed ? 'bg-green-50 text-green-700 ring-green-600/20' :
-                                'bg-red-50 text-red-700 ring-red-600/20'
-                            }`}
-                        >
-                            {Object.values(AppointmentStatus).map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                        <button 
-                          onClick={() => generateBill(appt)}
-                          className="p-2 text-gray-500 hover:text-indigo-600 border border-gray-200 rounded-full hover:bg-gray-50"
-                          title="Create Bill / PDF"
-                        >
-                            <FileText size={18} />
-                        </button>
-                    </div>
-                </div>
-            );
-        })}
-        {filteredAppointments.length === 0 && (
-            <div className="text-center py-10 text-gray-500 bg-white rounded-lg border border-dashed border-gray-300">
+      <div className="space-y-6">
+        {Object.keys(groupedAppointments).length === 0 ? (
+             <div className="text-center py-10 text-gray-500 bg-white rounded-lg border border-dashed border-gray-300">
                 No appointments match your filters.
             </div>
+        ) : (
+            Object.values(groupedAppointments).map(({ customer, appointments: customerAppts }) => {
+                // Group by Date for cleaner UI if multiple dates exist
+                const dates: { [date: string]: Appointment[] } = {};
+                customerAppts.forEach(a => {
+                    if (!dates[a.date]) dates[a.date] = [];
+                    dates[a.date].push(a);
+                });
+
+                return (
+                    <div key={customer?.id || 'unknown'} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                        {/* Customer Header */}
+                        <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                            <div className="flex items-center mb-2 sm:mb-0">
+                                <div className="h-10 w-10 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 font-bold mr-3">
+                                    <User size={20} />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-bold text-gray-900">{customer?.name || 'Unknown Client'}</h3>
+                                    {customer?.phone && (
+                                        <div className="text-xs text-gray-500 flex items-center">
+                                            <Phone size={12} className="mr-1" /> {customer.phone}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <div className="text-sm text-gray-500 bg-white px-3 py-1 rounded border border-gray-200">
+                                    {customerAppts.length} Service{customerAppts.length !== 1 ? 's' : ''}
+                                </div>
+                                <button 
+                                    onClick={() => customer && generateBill(customer, customerAppts)}
+                                    className="text-xs flex items-center px-3 py-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 text-gray-700 transition-colors"
+                                    title="Generate PDF Bill for all filtered services for this customer"
+                                >
+                                    <FileText size={14} className="mr-1.5 text-indigo-500" /> Create Bill
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Appointments Body */}
+                        <div className="divide-y divide-gray-100">
+                            {Object.entries(dates).sort((a,b) => b[0].localeCompare(a[0])).map(([date, dayAppts]) => (
+                                <div key={date} className="p-4 sm:p-6">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <div className="flex items-center text-sm font-semibold text-gray-700">
+                                            <CalendarIcon size={16} className="mr-2 text-rose-500"/> 
+                                            {new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric' })}
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
+                                        {dayAppts.sort((a,b) => a.time.localeCompare(b.time)).map((appt, idx) => {
+                                            const stylist = staff.find(s => s.id === appt.staffId);
+                                            return (
+                                                <div key={appt.id} className={`flex flex-col md:flex-row justify-between items-start md:items-center p-4 ${idx !== dayAppts.length - 1 ? 'border-b border-gray-200' : ''}`}>
+                                                    <div className="flex-1 min-w-0 mb-3 md:mb-0">
+                                                        <div className="flex items-center gap-3 mb-1">
+                                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                                                <Clock size={12} className="mr-1"/> {appt.time}
+                                                            </span>
+                                                            <span className="font-medium text-gray-900">{appt.serviceName}</span>
+                                                        </div>
+                                                        <div className="flex items-center text-sm text-gray-500 ml-1">
+                                                            <Scissors size={14} className="mr-1 text-gray-400"/> with {stylist?.name || 'Unknown Staff'}
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
+                                                        <div className="font-semibold text-gray-900 mr-4">
+                                                            ₹{appt.price}
+                                                        </div>
+                                                        <div className="min-w-[140px]">
+                                                            <select 
+                                                                value={appt.status}
+                                                                onChange={(e) => handleStatusChange(appt.id, e.target.value as AppointmentStatus)}
+                                                                className={`w-full text-xs font-semibold rounded-md py-1.5 pl-2 pr-8 border-0 ring-1 ring-inset focus:ring-2 focus:ring-indigo-600 sm:text-sm sm:leading-6 ${
+                                                                    appt.status === AppointmentStatus.Scheduled ? 'bg-blue-50 text-blue-700 ring-blue-600/20' :
+                                                                    appt.status === AppointmentStatus.Completed ? 'bg-green-50 text-green-700 ring-green-600/20' :
+                                                                    'bg-red-50 text-red-700 ring-red-600/20'
+                                                                }`}
+                                                            >
+                                                                {Object.values(AppointmentStatus).map(s => <option key={s} value={s}>{s}</option>)}
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            })
         )}
       </div>
 

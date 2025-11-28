@@ -30,6 +30,12 @@ const Login: React.FC = () => {
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="text-center">
+            <img 
+              src="/logo.png" 
+              alt="The London Salon" 
+              className="mx-auto h-16 w-auto mb-4"
+              onError={(e) => e.currentTarget.style.display = 'none'} 
+            />
             <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
                 The London Salon
             </h1>
