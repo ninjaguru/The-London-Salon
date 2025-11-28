@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db, createNotification, exportToCSV, getTodayIST } from '../services/db';
 import { Appointment, Staff, Customer, AppointmentStatus, Service, Category } from '../types';
-import { Plus, Clock, Scissors, Download, X, FileText, Search, User, Phone, Check, Tag, ChevronDown, Calendar as CalendarIcon, DollarSign } from 'lucide-react';
+import { Plus, Clock, Scissors, Download, X, FileText, Search, User, Phone, Check, Tag, ChevronDown, Calendar as CalendarIcon, DollarSign, LayoutList, ChevronLeft, ChevronRight } from 'lucide-react';
 import Modal from './ui/Modal';
 import { jsPDF } from 'jspdf';
 
@@ -13,12 +13,16 @@ const Appointments: React.FC = () => {
   const [services, setServices] = useState<Service[]>([]);
   const [categories, setCategories] = useState<Category[]>([]); 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
 
   // Type Ahead State
   const [customerSearch, setCustomerSearch] = useState('');
   const [showCustomerList, setShowCustomerList] = useState(false);
   const [serviceSearch, setServiceSearch] = useState('');
   const [showServiceList, setShowServiceList] = useState(false);
+
+  // Calendar State
+  const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date());
 
   // Filters State - Default: 1st of current month to Today (IST)
   const getFirstDayOfMonth = () => {
@@ -58,13 +62,13 @@ const Appointments: React.FC = () => {
     db.appointments.save(updated);
   };
 
-  const openBookModal = () => {
+  const openBookModal = (prefillDate?: string) => {
       setFormData({
         customerId: '', 
         staffId: '', 
         serviceId: '',
         serviceName: '', 
-        date: getTodayIST(), 
+        date: prefillDate || getTodayIST(), 
         time: '10:00', 
         durationMin: 60, 
         price: 0
@@ -300,19 +304,59 @@ const Appointments: React.FC = () => {
     doc.save(`Invoice_${customer.name.replace(/\s+/g, '_')}_${invoiceDate}.pdf`);
   };
 
+  // --- Calendar Helpers ---
+  const calendarDays = () => {
+      const year = currentCalendarDate.getFullYear();
+      const month = currentCalendarDate.getMonth();
+      const firstDay = new Date(year, month, 1);
+      const lastDay = new Date(year, month + 1, 0);
+      
+      const daysInMonth = lastDay.getDate();
+      const startDayOfWeek = firstDay.getDay(); // 0 = Sun, 1 = Mon...
+      
+      const days = [];
+      
+      // Empty slots for previous month
+      for (let i = 0; i < startDayOfWeek; i++) {
+          days.push(null);
+      }
+      
+      // Actual days
+      for (let i = 1; i <= daysInMonth; i++) {
+          days.push(new Date(year, month, i));
+      }
+      
+      return days;
+  };
+
+  const nextMonth = () => {
+      setCurrentCalendarDate(new Date(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth() + 1, 1));
+  };
+  
+  const prevMonth = () => {
+      setCurrentCalendarDate(new Date(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth() - 1, 1));
+  };
+
+  const goToToday = () => {
+      setCurrentCalendarDate(new Date());
+  };
+
   // Filter & Sort
   const filteredAppointments = appointments.filter(a => {
       const matchesStaff = filterStaff ? a.staffId === filterStaff : true;
-      const matchesStartDate = filterStartDate ? a.date >= filterStartDate : true;
-      const matchesEndDate = filterEndDate ? a.date <= filterEndDate : true;
       const matchesStatus = filterStatus ? a.status === filterStatus : true;
+      
+      // Date filters only apply in list mode to avoid confusion in calendar
+      const matchesStartDate = viewMode === 'list' && filterStartDate ? a.date >= filterStartDate : true;
+      const matchesEndDate = viewMode === 'list' && filterEndDate ? a.date <= filterEndDate : true;
+
       return matchesStaff && matchesStartDate && matchesEndDate && matchesStatus;
   }).sort((a, b) => {
       if (a.date !== b.date) return a.date.localeCompare(b.date);
       return a.time.localeCompare(b.time);
   });
 
-  // Group by Customer ID
+  // Group by Customer ID (List View)
   const groupedAppointments: { [key: string]: { customer: Customer | undefined, appointments: Appointment[] } } = {};
 
   filteredAppointments.forEach(appt => {
@@ -326,10 +370,26 @@ const Appointments: React.FC = () => {
   });
 
   return (
-    <div>
+    <div className="flex flex-col h-full">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <h2 className="text-2xl font-bold text-gray-800">Appointments</h2>
         <div className="flex gap-2">
+            <div className="bg-white border border-gray-300 rounded-lg p-0.5 flex items-center">
+                <button 
+                    onClick={() => setViewMode('list')}
+                    className={`p-2 rounded-md ${viewMode === 'list' ? 'bg-rose-50 text-rose-600' : 'text-gray-500 hover:text-gray-700'}`}
+                    title="List View"
+                >
+                    <LayoutList size={18} />
+                </button>
+                <button 
+                    onClick={() => setViewMode('calendar')}
+                    className={`p-2 rounded-md ${viewMode === 'calendar' ? 'bg-rose-50 text-rose-600' : 'text-gray-500 hover:text-gray-700'}`}
+                    title="Calendar View"
+                >
+                    <CalendarIcon size={18} />
+                </button>
+            </div>
             <button 
                 onClick={() => exportToCSV(filteredAppointments, 'appointments')}
                 className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm"
@@ -337,7 +397,7 @@ const Appointments: React.FC = () => {
                 <Download className="w-4 h-4 mr-2" /> Export
             </button>
             <button 
-            onClick={openBookModal}
+            onClick={() => openBookModal()}
             className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
             >
             <Plus size={18} /> Book Appointment
@@ -347,24 +407,28 @@ const Appointments: React.FC = () => {
 
       {/* Filters Bar */}
       <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6 flex flex-col md:flex-row gap-4 items-end flex-wrap">
-          <div className="w-full md:w-auto">
-              <label className="block text-xs font-medium text-gray-500 mb-1">From Date</label>
-              <input 
-                  type="date" 
-                  value={filterStartDate} 
-                  onChange={e => setFilterStartDate(e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"
-               />
-          </div>
-          <div className="w-full md:w-auto">
-              <label className="block text-xs font-medium text-gray-500 mb-1">To Date</label>
-              <input 
-                  type="date" 
-                  value={filterEndDate} 
-                  onChange={e => setFilterEndDate(e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"
-               />
-          </div>
+          {viewMode === 'list' && (
+              <>
+                <div className="w-full md:w-auto">
+                    <label className="block text-xs font-medium text-gray-500 mb-1">From Date</label>
+                    <input 
+                        type="date" 
+                        value={filterStartDate} 
+                        onChange={e => setFilterStartDate(e.target.value)}
+                        className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"
+                    />
+                </div>
+                <div className="w-full md:w-auto">
+                    <label className="block text-xs font-medium text-gray-500 mb-1">To Date</label>
+                    <input 
+                        type="date" 
+                        value={filterEndDate} 
+                        onChange={e => setFilterEndDate(e.target.value)}
+                        className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"
+                    />
+                </div>
+              </>
+          )}
           <div className="w-full md:w-auto">
               <label className="block text-xs font-medium text-gray-500 mb-1">Staff Member</label>
               <select 
@@ -394,110 +458,192 @@ const Appointments: React.FC = () => {
               <X size={14} className="mr-1" /> Clear
           </button>
       </div>
+    
+      {/* --- LIST VIEW --- */}
+      {viewMode === 'list' && (
+        <div className="space-y-6">
+            {Object.keys(groupedAppointments).length === 0 ? (
+                <div className="text-center py-10 text-gray-500 bg-white rounded-lg border border-dashed border-gray-300">
+                    No appointments match your filters.
+                </div>
+            ) : (
+                Object.values(groupedAppointments).map(({ customer, appointments: customerAppts }) => {
+                    // Group by Date for cleaner UI if multiple dates exist
+                    const dates: { [date: string]: Appointment[] } = {};
+                    customerAppts.forEach(a => {
+                        if (!dates[a.date]) dates[a.date] = [];
+                        dates[a.date].push(a);
+                    });
 
-      <div className="space-y-6">
-        {Object.keys(groupedAppointments).length === 0 ? (
-             <div className="text-center py-10 text-gray-500 bg-white rounded-lg border border-dashed border-gray-300">
-                No appointments match your filters.
-            </div>
-        ) : (
-            Object.values(groupedAppointments).map(({ customer, appointments: customerAppts }) => {
-                // Group by Date for cleaner UI if multiple dates exist
-                const dates: { [date: string]: Appointment[] } = {};
-                customerAppts.forEach(a => {
-                    if (!dates[a.date]) dates[a.date] = [];
-                    dates[a.date].push(a);
-                });
-
-                return (
-                    <div key={customer?.id || 'unknown'} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                        {/* Customer Header */}
-                        <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center">
-                            <div className="flex items-center mb-2 sm:mb-0">
-                                <div className="h-10 w-10 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 font-bold mr-3">
-                                    <User size={20} />
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-bold text-gray-900">{customer?.name || 'Unknown Client'}</h3>
-                                    {customer?.phone && (
-                                        <div className="text-xs text-gray-500 flex items-center">
-                                            <Phone size={12} className="mr-1" /> {customer.phone}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <div className="text-sm text-gray-500 bg-white px-3 py-1 rounded border border-gray-200">
-                                    {customerAppts.length} Service{customerAppts.length !== 1 ? 's' : ''}
-                                </div>
-                                <button 
-                                    onClick={() => customer && generateBill(customer, customerAppts)}
-                                    className="text-xs flex items-center px-3 py-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 text-gray-700 transition-colors"
-                                    title="Generate PDF Bill for all filtered services for this customer"
-                                >
-                                    <FileText size={14} className="mr-1.5 text-indigo-500" /> Create Bill
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Appointments Body */}
-                        <div className="divide-y divide-gray-100">
-                            {Object.entries(dates).sort((a,b) => b[0].localeCompare(a[0])).map(([date, dayAppts]) => (
-                                <div key={date} className="p-4 sm:p-6">
-                                    <div className="flex justify-between items-center mb-4">
-                                        <div className="flex items-center text-sm font-semibold text-gray-700">
-                                            <CalendarIcon size={16} className="mr-2 text-rose-500"/> 
-                                            {new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric' })}
-                                        </div>
+                    return (
+                        <div key={customer?.id || 'unknown'} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                            {/* Customer Header */}
+                            <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                                <div className="flex items-center mb-2 sm:mb-0">
+                                    <div className="h-10 w-10 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 font-bold mr-3">
+                                        <User size={20} />
                                     </div>
-                                    
-                                    <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
-                                        {dayAppts.sort((a,b) => a.time.localeCompare(b.time)).map((appt, idx) => {
-                                            const stylist = staff.find(s => s.id === appt.staffId);
-                                            return (
-                                                <div key={appt.id} className={`flex flex-col md:flex-row justify-between items-start md:items-center p-4 ${idx !== dayAppts.length - 1 ? 'border-b border-gray-200' : ''}`}>
-                                                    <div className="flex-1 min-w-0 mb-3 md:mb-0">
-                                                        <div className="flex items-center gap-3 mb-1">
-                                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                                                                <Clock size={12} className="mr-1"/> {appt.time}
-                                                            </span>
-                                                            <span className="font-medium text-gray-900">{appt.serviceName}</span>
-                                                        </div>
-                                                        <div className="flex items-center text-sm text-gray-500 ml-1">
-                                                            <Scissors size={14} className="mr-1 text-gray-400"/> with {stylist?.name || 'Unknown Staff'}
-                                                        </div>
-                                                    </div>
-                                                    
-                                                    <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
-                                                        <div className="font-semibold text-gray-900 mr-4">
-                                                            ₹{appt.price}
-                                                        </div>
-                                                        <div className="min-w-[140px]">
-                                                            <select 
-                                                                value={appt.status}
-                                                                onChange={(e) => handleStatusChange(appt.id, e.target.value as AppointmentStatus)}
-                                                                className={`w-full text-xs font-semibold rounded-md py-1.5 pl-2 pr-8 border-0 ring-1 ring-inset focus:ring-2 focus:ring-indigo-600 sm:text-sm sm:leading-6 ${
-                                                                    appt.status === AppointmentStatus.Scheduled ? 'bg-blue-50 text-blue-700 ring-blue-600/20' :
-                                                                    appt.status === AppointmentStatus.Completed ? 'bg-green-50 text-green-700 ring-green-600/20' :
-                                                                    'bg-red-50 text-red-700 ring-red-600/20'
-                                                                }`}
-                                                            >
-                                                                {Object.values(AppointmentStatus).map(s => <option key={s} value={s}>{s}</option>)}
-                                                            </select>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
+                                    <div>
+                                        <h3 className="text-lg font-bold text-gray-900">{customer?.name || 'Unknown Client'}</h3>
+                                        {customer?.phone && (
+                                            <div className="text-xs text-gray-500 flex items-center">
+                                                <Phone size={12} className="mr-1" /> {customer.phone}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
-                            ))}
+                                <div className="flex items-center gap-3">
+                                    <div className="text-sm text-gray-500 bg-white px-3 py-1 rounded border border-gray-200">
+                                        {customerAppts.length} Service{customerAppts.length !== 1 ? 's' : ''}
+                                    </div>
+                                    <button 
+                                        onClick={() => customer && generateBill(customer, customerAppts)}
+                                        className="text-xs flex items-center px-3 py-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 text-gray-700 transition-colors"
+                                        title="Generate PDF Bill for all filtered services for this customer"
+                                    >
+                                        <FileText size={14} className="mr-1.5 text-indigo-500" /> Create Bill
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Appointments Body */}
+                            <div className="divide-y divide-gray-100">
+                                {Object.entries(dates).sort((a,b) => b[0].localeCompare(a[0])).map(([date, dayAppts]) => (
+                                    <div key={date} className="p-4 sm:p-6">
+                                        <div className="flex justify-between items-center mb-4">
+                                            <div className="flex items-center text-sm font-semibold text-gray-700">
+                                                <CalendarIcon size={16} className="mr-2 text-rose-500"/> 
+                                                {new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric' })}
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
+                                            {dayAppts.sort((a,b) => a.time.localeCompare(b.time)).map((appt, idx) => {
+                                                const stylist = staff.find(s => s.id === appt.staffId);
+                                                return (
+                                                    <div key={appt.id} className={`flex flex-col md:flex-row justify-between items-start md:items-center p-4 ${idx !== dayAppts.length - 1 ? 'border-b border-gray-200' : ''}`}>
+                                                        <div className="flex-1 min-w-0 mb-3 md:mb-0">
+                                                            <div className="flex items-center gap-3 mb-1">
+                                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                                                    <Clock size={12} className="mr-1"/> {appt.time}
+                                                                </span>
+                                                                <span className="font-medium text-gray-900">{appt.serviceName}</span>
+                                                            </div>
+                                                            <div className="flex items-center text-sm text-gray-500 ml-1">
+                                                                <Scissors size={14} className="mr-1 text-gray-400"/> with {stylist?.name || 'Unknown Staff'}
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
+                                                            <div className="font-semibold text-gray-900 mr-4">
+                                                                ₹{appt.price}
+                                                            </div>
+                                                            <div className="min-w-[140px]">
+                                                                <select 
+                                                                    value={appt.status}
+                                                                    onChange={(e) => handleStatusChange(appt.id, e.target.value as AppointmentStatus)}
+                                                                    className={`w-full text-xs font-semibold rounded-md py-1.5 pl-2 pr-8 border-0 ring-1 ring-inset focus:ring-2 focus:ring-indigo-600 sm:text-sm sm:leading-6 ${
+                                                                        appt.status === AppointmentStatus.Scheduled ? 'bg-blue-50 text-blue-700 ring-blue-600/20' :
+                                                                        appt.status === AppointmentStatus.Completed ? 'bg-green-50 text-green-700 ring-green-600/20' :
+                                                                        'bg-red-50 text-red-700 ring-red-600/20'
+                                                                    }`}
+                                                                >
+                                                                    {Object.values(AppointmentStatus).map(s => <option key={s} value={s}>{s}</option>)}
+                                                                </select>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
+                    );
+                })
+            )}
+        </div>
+      )}
+
+      {/* --- CALENDAR VIEW --- */}
+      {viewMode === 'calendar' && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col flex-1 overflow-hidden">
+             {/* Calendar Header */}
+             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
+                <div className="flex items-center gap-4">
+                    <h3 className="text-lg font-bold text-gray-900">
+                        {currentCalendarDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                    </h3>
+                    <div className="flex items-center bg-white rounded-md shadow-sm border border-gray-300">
+                         <button onClick={prevMonth} className="p-1.5 hover:bg-gray-100 text-gray-600"><ChevronLeft size={18} /></button>
+                         <button onClick={goToToday} className="px-3 py-1.5 text-xs font-medium hover:bg-gray-100 border-x border-gray-300 text-gray-700">Today</button>
+                         <button onClick={nextMonth} className="p-1.5 hover:bg-gray-100 text-gray-600"><ChevronRight size={18} /></button>
                     </div>
-                );
-            })
-        )}
-      </div>
+                </div>
+             </div>
+
+             {/* Weekday Header */}
+             <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50">
+                 {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                     <div key={day} className="py-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                         {day}
+                     </div>
+                 ))}
+             </div>
+
+             {/* Calendar Grid */}
+             <div className="grid grid-cols-7 grid-rows-5 flex-1 bg-gray-200 gap-[1px] overflow-y-auto">
+                 {calendarDays().map((date, idx) => {
+                     if (!date) return <div key={`empty-${idx}`} className="bg-gray-50/50"></div>;
+                     
+                     const dateStr = date.toLocaleDateString('en-CA'); // YYYY-MM-DD
+                     const isToday = dateStr === getTodayIST();
+                     const dayAppts = filteredAppointments.filter(a => a.date === dateStr);
+
+                     return (
+                         <div 
+                            key={dateStr} 
+                            className={`bg-white p-2 min-h-[120px] relative hover:bg-gray-50 transition-colors cursor-pointer group`}
+                            onClick={() => openBookModal(dateStr)}
+                         >
+                             <div className={`text-xs font-medium mb-1 flex justify-between items-center ${isToday ? 'text-rose-600 font-bold' : 'text-gray-700'}`}>
+                                 <span className={isToday ? 'bg-rose-100 px-1.5 py-0.5 rounded-full' : ''}>{date.getDate()}</span>
+                                 {dayAppts.length > 0 && <span className="text-[10px] text-gray-400">{dayAppts.length} appts</span>}
+                             </div>
+
+                             <div className="space-y-1 overflow-y-auto max-h-[90px] pr-1 scrollbar-hide">
+                                 {dayAppts.map(appt => {
+                                      const customerName = customers.find(c => c.id === appt.customerId)?.name || 'Unknown';
+                                      const bgColor = appt.status === 'Completed' ? 'bg-green-100 text-green-800 border-green-200' : 
+                                                      appt.status === 'Cancelled' ? 'bg-red-50 text-red-800 border-red-100' : 
+                                                      'bg-blue-50 text-blue-700 border-blue-100';
+                                      return (
+                                          <div 
+                                            key={appt.id} 
+                                            onClick={(e) => { e.stopPropagation(); /* Could open detailed view */ }}
+                                            className={`text-[10px] px-1.5 py-1 rounded border truncate flex items-center gap-1 ${bgColor}`}
+                                            title={`${appt.time} - ${customerName} (${appt.serviceName})`}
+                                          >
+                                              <span className="font-mono opacity-75">{appt.time}</span>
+                                              <span className="font-medium truncate">{customerName}</span>
+                                          </div>
+                                      );
+                                 })}
+                             </div>
+                             
+                             {/* Add Button on Hover */}
+                             <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div className="bg-rose-50 text-rose-600 p-1 rounded-full shadow-sm hover:bg-rose-100">
+                                    <Plus size={14} />
+                                </div>
+                             </div>
+                         </div>
+                     );
+                 })}
+             </div>
+          </div>
+      )}
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="New Appointment">
         <form onSubmit={handleSubmit} className="space-y-4 h-[70vh] overflow-y-auto px-1 relative">
