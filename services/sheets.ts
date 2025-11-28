@@ -8,10 +8,14 @@ export interface SheetResponse {
 const STORAGE_KEY_URL = 'salon_google_sheet_url';
 const STORAGE_KEY_VIEW_URL = 'salon_google_sheet_view_url';
 
+// Hardcoded Defaults provided by user
+const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbywki4ZvZsoDSaBlhyhD8ocBFI-9bCxpI1wTMktX3VYKgAraTcb9ZFiDu5GuAKrZEDstg/exec';
+const DEFAULT_VIEW_URL = 'https://docs.google.com/spreadsheets/d/1XQxJD-qSNQZZqMEMaXLS5eAa69V4NZi3IeA8L1XG-pM/edit?gid=0#gid=0';
+
 export const sheetsService = {
-  // Get the configured Web App URL
+  // Get the configured Web App URL (or default)
   getScriptUrl: (): string => {
-    return localStorage.getItem(STORAGE_KEY_URL) || '';
+    return localStorage.getItem(STORAGE_KEY_URL) || DEFAULT_SCRIPT_URL;
   },
 
   // Save the Web App URL
@@ -19,9 +23,9 @@ export const sheetsService = {
     localStorage.setItem(STORAGE_KEY_URL, url);
   },
 
-  // Get the configured Spreadsheet View URL
+  // Get the configured Spreadsheet View URL (or default)
   getViewUrl: (): string => {
-    return localStorage.getItem(STORAGE_KEY_VIEW_URL) || '';
+    return localStorage.getItem(STORAGE_KEY_VIEW_URL) || DEFAULT_VIEW_URL;
   },
 
   // Save the Spreadsheet View URL
@@ -29,9 +33,9 @@ export const sheetsService = {
     localStorage.setItem(STORAGE_KEY_VIEW_URL, url);
   },
 
-  // Check if configured
+  // Check if configured (Always true now due to defaults)
   isConfigured: (): boolean => {
-    return !!localStorage.getItem(STORAGE_KEY_URL);
+    return !!sheetsService.getScriptUrl();
   },
 
   // Fetch all data (Pull)

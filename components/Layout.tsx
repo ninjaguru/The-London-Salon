@@ -23,7 +23,7 @@ import {
   Cloud,
   FileSpreadsheet
 } from 'lucide-react';
-import { db, createNotification } from '../services/db';
+import { db, createNotification, syncFromCloud } from '../services/db';
 import { authService } from '../services/auth';
 import { sheetsService } from '../services/sheets';
 
@@ -40,6 +40,25 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Auto-sync on login or app load if user exists
+  useEffect(() => {
+    if (user && location.pathname !== '/login') {
+       // Perform a background sync to get latest data from sheets
+       syncFromCloud().then(res => {
+         if (res.success) {
+           console.log('Auto-sync successful');
+           // Optionally trigger a re-render or data refresh here if needed, 
+           // but since components read from localStorage on mount/update, 
+           // and syncFromCloud updates localStorage, a page refresh might be needed 
+           // or we rely on the user navigating to see new data.
+           // For now, we just log it. A forced reload is disruptive.
+         } else {
+           console.warn('Auto-sync failed:', res.message);
+         }
+       });
+    }
+  }, [user, location.pathname]);
 
   // Check for notifications periodically and update user state
   useEffect(() => {
