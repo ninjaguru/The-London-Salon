@@ -40,12 +40,45 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   
   // Loading State
   const [isGlobalSyncing, setIsGlobalSyncing] = useState(false);
+
+  // Clock State
+  const [currentTime, setCurrentTime] = useState(new Date());
   
   // Ref to track if we have already synced this session to prevent re-sync on navigation
   const hasSynced = useRef(false);
   
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Clock Effect
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Format Time for IST
+  const getISTTime = (date: Date) => {
+    return {
+      dateStr: date.toLocaleDateString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        weekday: 'short',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      }),
+      timeStr: date.toLocaleTimeString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      })
+    };
+  };
+
+  const { dateStr, timeStr } = getISTTime(currentTime);
 
   // Auto-sync on login or app load if user exists
   useEffect(() => {
@@ -326,6 +359,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     <Cloud className="w-3 h-3 mr-1" /> Online
                 </div>
             )}
+
+            {/* IST Clock */}
+            <div className="hidden sm:flex flex-col items-end border-r border-gray-200 pr-4 mr-2">
+                <span className="text-[10px] text-gray-500 font-medium uppercase tracking-wider">{dateStr}</span>
+                <span className="text-sm font-bold text-gray-800 font-mono leading-none mt-0.5">{timeStr}</span>
+            </div>
 
             <button 
                 onClick={() => navigate('/notifications')}
