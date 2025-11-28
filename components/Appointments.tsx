@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db, createNotification, exportToCSV } from '../services/db';
 import { Appointment, Staff, Customer, AppointmentStatus, Service, Category } from '../types';
-import { Plus, Clock, Scissors, Download, X, FileText, Search, User, Phone, Check, Tag } from 'lucide-react';
+import { Plus, Clock, Scissors, Download, X, FileText, Search, User, Phone, Check, Tag, ChevronDown } from 'lucide-react';
 import Modal from './ui/Modal';
 import { jsPDF } from 'jspdf';
 
@@ -11,7 +11,7 @@ const Appointments: React.FC = () => {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [services, setServices] = useState<Service[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]); // Added categories
+  const [categories, setCategories] = useState<Category[]>([]); 
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Type Ahead State
@@ -122,6 +122,12 @@ const Appointments: React.FC = () => {
       setShowCustomerList(false);
   };
 
+  const clearCustomerSelection = () => {
+      setFormData({ ...formData, customerId: '' });
+      setCustomerSearch('');
+      setShowCustomerList(false);
+  };
+
   const selectService = (service: Service) => {
       setFormData({
           ...formData,
@@ -131,6 +137,18 @@ const Appointments: React.FC = () => {
           durationMin: service.durationMin
       });
       setServiceSearch(service.name);
+      setShowServiceList(false);
+  };
+
+  const clearServiceSelection = () => {
+      setFormData({
+          ...formData,
+          serviceId: '',
+          serviceName: '',
+          price: 0,
+          durationMin: 60
+      });
+      setServiceSearch('');
       setShowServiceList(false);
   };
 
@@ -365,7 +383,7 @@ const Appointments: React.FC = () => {
       </div>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="New Appointment">
-        <form onSubmit={handleSubmit} className="space-y-4 h-[70vh] overflow-y-auto px-1">
+        <form onSubmit={handleSubmit} className="space-y-4 h-[70vh] overflow-y-auto px-1 relative">
             {/* Customer Type Ahead */}
             <div className="relative">
                 <label className="block text-sm font-medium text-gray-700">Select Customer (Name or Phone)</label>
@@ -379,33 +397,39 @@ const Appointments: React.FC = () => {
                         onChange={(e) => {
                             setCustomerSearch(e.target.value);
                             setShowCustomerList(true);
-                            if (formData.customerId) setFormData({...formData, customerId: ''}); // Clear selection on edit
+                            if (formData.customerId) setFormData({...formData, customerId: ''}); 
                         }}
                         onFocus={() => setShowCustomerList(true)}
-                        placeholder="Search customer..."
-                        className={`block w-full pl-10 pr-3 py-2 border rounded-md shadow-sm focus:ring-rose-500 focus:border-rose-500 sm:text-sm ${!formData.customerId && customerSearch ? 'border-amber-400' : 'border-gray-300'}`}
+                        placeholder="Search customer name or phone..."
+                        className={`block w-full pl-10 pr-10 py-2 border rounded-md shadow-sm focus:ring-rose-500 focus:border-rose-500 sm:text-sm ${!formData.customerId && customerSearch ? 'border-amber-400' : 'border-gray-300'}`}
                     />
-                    {formData.customerId && (
-                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                            <Check className="h-4 w-4 text-green-500" />
+                    {formData.customerId ? (
+                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer" onClick={clearCustomerSelection}>
+                             <X className="h-4 w-4 text-gray-400 hover:text-red-500" />
                         </div>
+                    ) : (
+                         customerSearch && (
+                            <div className="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer" onClick={() => { setCustomerSearch(''); setShowCustomerList(false); }}>
+                                <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                            </div>
+                         )
                     )}
                 </div>
                 
                 {showCustomerList && customerSearch && (
-                    <div className="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
+                    <div className="absolute z-50 mt-1 w-full bg-white shadow-xl max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
                         {filteredCustomers.length > 0 ? (
                             filteredCustomers.map(c => (
                                 <div 
                                     key={c.id}
                                     onClick={() => selectCustomer(c)}
-                                    className="cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-rose-50 flex items-center"
+                                    className="cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-rose-50 flex items-center border-b border-gray-50 last:border-0"
                                 >
-                                    <div className="h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 mr-3">
+                                    <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-500 mr-3 flex-shrink-0">
                                         <User size={16} />
                                     </div>
                                     <div>
-                                        <span className="block font-medium truncate">{c.name}</span>
+                                        <span className="block font-medium truncate text-gray-900">{c.name}</span>
                                         <span className="block text-xs text-gray-500 truncate flex items-center">
                                             <Phone size={10} className="mr-1" /> {c.phone}
                                         </span>
@@ -421,10 +445,10 @@ const Appointments: React.FC = () => {
                 )}
             </div>
 
-            {/* Staff Selection (Standard Dropdown) */}
+            {/* Staff Selection */}
             <div>
                 <label className="block text-sm font-medium text-gray-700">Staff</label>
-                <select name="staffId" required value={formData.staffId} onChange={handleChange} className="mt-1 block w-full border p-2 rounded-md border-gray-300">
+                <select name="staffId" required value={formData.staffId} onChange={handleChange} className="mt-1 block w-full border p-2 rounded-md border-gray-300 bg-white">
                     <option value="">Select Staff</option>
                     {staff.map(s => <option key={s.id} value={s.id}>{s.name} ({s.role})</option>)}
                 </select>
@@ -443,56 +467,72 @@ const Appointments: React.FC = () => {
                         onChange={(e) => {
                             setServiceSearch(e.target.value);
                             setShowServiceList(true);
+                            if (formData.serviceId) setFormData({...formData, serviceId: '', price: 0, durationMin: 60, serviceName: ''});
                         }}
                         onFocus={() => setShowServiceList(true)}
                         placeholder="Search service..."
-                        className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-rose-500 focus:border-rose-500 sm:text-sm"
+                        className={`block w-full pl-10 pr-10 py-2 border rounded-md shadow-sm focus:ring-rose-500 focus:border-rose-500 sm:text-sm ${formData.serviceId ? 'border-green-300 bg-green-50' : 'border-gray-300'}`}
                     />
+                     {formData.serviceId ? (
+                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer" onClick={clearServiceSelection}>
+                             <X className="h-4 w-4 text-gray-400 hover:text-red-500" />
+                        </div>
+                    ) : (
+                         serviceSearch && (
+                            <div className="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer" onClick={() => { setServiceSearch(''); setShowServiceList(false); }}>
+                                <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                            </div>
+                         )
+                    )}
                 </div>
 
                 {showServiceList && (
-                    <div className="absolute z-10 mt-1 w-full bg-white shadow-xl max-h-80 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
+                    <div className="absolute z-50 mt-1 w-full bg-white shadow-2xl max-h-80 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm border border-gray-100">
                         {filteredServices.length > 0 ? (
                             filteredServices.map(s => (
                                 <div 
                                     key={s.id}
                                     onClick={() => selectService(s)}
-                                    className="cursor-pointer select-none relative py-3 pl-3 pr-4 hover:bg-rose-50 border-b border-gray-50 last:border-0"
+                                    className="cursor-pointer select-none relative p-3 hover:bg-rose-50 border-b border-gray-100 last:border-0 transition-colors"
                                 >
                                     <div className="flex justify-between items-start">
                                         <div>
                                             <div className="font-bold text-gray-900">{s.name}</div>
-                                            <div className="flex items-center gap-2 mt-1">
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
+                                            <div className="flex flex-wrap items-center gap-2 mt-1">
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600 border border-gray-200">
                                                     <Tag size={10} className="mr-1"/> {getCategoryName(s.categoryId)}
                                                 </span>
-                                                <span className="text-xs text-gray-500 flex items-center">
+                                                <span className="inline-flex items-center text-[10px] text-gray-500 bg-white px-1.5 py-0.5 rounded border border-gray-200">
                                                     <Clock size={10} className="mr-1"/> {s.durationMin}m
                                                 </span>
-                                                <span className="text-xs text-gray-500 px-1.5 py-0.5 rounded border border-gray-200">
+                                                <span className={`inline-flex items-center text-[10px] px-1.5 py-0.5 rounded border ${
+                                                    s.gender === 'Women' ? 'border-pink-200 bg-pink-50 text-pink-700' :
+                                                    s.gender === 'Men' ? 'border-blue-200 bg-blue-50 text-blue-700' :
+                                                    'border-purple-200 bg-purple-50 text-purple-700'
+                                                }`}>
                                                     {s.gender}
                                                 </span>
                                             </div>
                                         </div>
-                                        <div className="text-right">
+                                        <div className="text-right ml-2 flex-shrink-0">
                                              {s.offerPrice ? (
                                                 <div className="flex flex-col items-end">
-                                                    <span className="text-green-600 font-bold">₹{s.offerPrice}</span>
+                                                    <span className="text-green-600 font-bold bg-green-50 px-1 rounded">₹{s.offerPrice}</span>
                                                     <span className="text-gray-400 text-xs line-through">₹{s.price}</span>
                                                 </div>
                                             ) : (
-                                                <span className="text-gray-900 font-bold">₹{s.price}</span>
+                                                <span className="text-gray-900 font-bold bg-gray-50 px-1 rounded">₹{s.price}</span>
                                             )}
                                         </div>
                                     </div>
                                     {s.description && (
-                                        <p className="text-xs text-gray-500 mt-1 line-clamp-1">{s.description}</p>
+                                        <p className="text-xs text-gray-500 mt-2 line-clamp-1 italic">{s.description}</p>
                                     )}
                                 </div>
                             ))
                         ) : (
-                            <div className="cursor-default select-none relative py-2 pl-3 pr-9 text-gray-500 italic">
-                                No services found.
+                            <div className="cursor-default select-none relative py-3 px-4 text-gray-500 italic text-center">
+                                No services found matching "{serviceSearch}"
                             </div>
                         )}
                     </div>
@@ -501,7 +541,16 @@ const Appointments: React.FC = () => {
 
             <div>
                 <label className="block text-sm font-medium text-gray-700">Service Name (Manual Override)</label>
-                <input name="serviceName" type="text" required value={formData.serviceName} onChange={handleChange} placeholder="e.g. Haircut" className="mt-1 block w-full border p-2 rounded-md border-gray-300" />
+                <input 
+                    name="serviceName" 
+                    type="text" 
+                    required 
+                    value={formData.serviceName} 
+                    onChange={handleChange} 
+                    placeholder="e.g. Haircut" 
+                    className={`mt-1 block w-full border p-2 rounded-md border-gray-300 ${formData.serviceId ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-white'}`}
+                    readOnly={!!formData.serviceId}
+                />
             </div>
             <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -523,9 +572,9 @@ const Appointments: React.FC = () => {
                     <input name="price" type="number" required value={formData.price} onChange={handleChange} className="mt-1 block w-full border p-2 rounded-md border-gray-300" />
                 </div>
             </div>
-            <div className="mt-5 sm:mt-6">
-                <button type="submit" className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-rose-600 text-base font-medium text-white hover:bg-rose-700">
-                  Book
+            <div className="mt-5 sm:mt-6 pb-2">
+                <button type="submit" className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-rose-600 text-base font-medium text-white hover:bg-rose-700 focus:outline-none ring-2 ring-offset-2 ring-rose-500">
+                  Book Appointment
                 </button>
             </div>
         </form>
