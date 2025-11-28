@@ -38,27 +38,29 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [isCloudConfigured, setIsCloudConfigured] = useState(false);
   const [sheetViewUrl, setSheetViewUrl] = useState('');
   
+  // Loading State
+  const [isGlobalSyncing, setIsGlobalSyncing] = useState(false);
+  
   const navigate = useNavigate();
   const location = useLocation();
 
   // Auto-sync on login or app load if user exists
   useEffect(() => {
     if (user && location.pathname !== '/login') {
+       setIsGlobalSyncing(true);
        // Perform a background sync to get latest data from sheets
        syncFromCloud().then(res => {
          if (res.success) {
            console.log('Auto-sync successful');
-           // Optionally trigger a re-render or data refresh here if needed, 
-           // but since components read from localStorage on mount/update, 
-           // and syncFromCloud updates localStorage, a page refresh might be needed 
-           // or we rely on the user navigating to see new data.
-           // For now, we just log it. A forced reload is disruptive.
          } else {
            console.warn('Auto-sync failed:', res.message);
          }
+       }).finally(() => {
+         // Add a small delay for better UX so it doesn't flash too fast
+         setTimeout(() => setIsGlobalSyncing(false), 500);
        });
     }
-  }, [user, location.pathname]);
+  }, [user]); // Removed location.pathname to prevent re-syncing on every navigation click
 
   // Check for notifications periodically and update user state
   useEffect(() => {
@@ -156,6 +158,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
+      {/* Loading Overlay */}
+      {isGlobalSyncing && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900 bg-opacity-60 backdrop-blur-sm transition-opacity">
+          <div className="bg-white p-6 rounded-xl shadow-2xl flex flex-col items-center animate-bounce-small">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-rose-600 mb-4"></div>
+            <h3 className="text-lg font-bold text-gray-800">Syncing Data</h3>
+            <p className="text-sm text-gray-500 mt-1">Please wait while we update your salon data...</p>
+          </div>
+        </div>
+      )}
+
       {/* Sidebar - Desktop */}
       <aside className="hidden md:flex md:flex-col w-64 bg-white border-r border-gray-200">
         <div className="flex flex-col items-center justify-center min-h-[7rem] border-b border-gray-100 p-4">
@@ -283,8 +296,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
           
           <div className="flex items-center space-x-4">
-            {/* View Data Link */}
-            {sheetViewUrl && (
+            {/* View Data Link - Admin Only */}
+            {sheetViewUrl && user?.role === 'Admin' && (
               <a 
                 href={sheetViewUrl} 
                 target="_blank" 
