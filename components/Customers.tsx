@@ -23,8 +23,14 @@ const Customers: React.FC = () => {
 
   // Form
   const [formData, setFormData] = useState({
-    name: '', email: '', phone: '', apartment: '', birthday: '', anniversary: ''
+    name: '', email: '', phone: '', apartment: ''
   });
+  
+  // Date State for custom Month/Day selectors
+  const [bDay, setBDay] = useState('');
+  const [bMonth, setBMonth] = useState('');
+  const [aDay, setADay] = useState('');
+  const [aMonth, setAMonth] = useState('');
 
   // Wallet Topup
   const [selectedMembershipId, setSelectedMembershipId] = useState('');
@@ -42,12 +48,35 @@ const Customers: React.FC = () => {
         email: customer.email,
         phone: customer.phone,
         apartment: customer.apartment,
-        birthday: customer.birthday,
-        anniversary: customer.anniversary,
       });
+      
+      // Parse Birthday
+      if (customer.birthday) {
+          const d = new Date(customer.birthday);
+          setBDay(d.getDate().toString());
+          setBMonth((d.getMonth() + 1).toString());
+      } else {
+          setBDay('');
+          setBMonth('');
+      }
+
+      // Parse Anniversary
+      if (customer.anniversary) {
+          const d = new Date(customer.anniversary);
+          setADay(d.getDate().toString());
+          setAMonth((d.getMonth() + 1).toString());
+      } else {
+          setADay('');
+          setAMonth('');
+      }
+
     } else {
       setEditingCustomer(null);
-      setFormData({ name: '', email: '', phone: '', apartment: '', birthday: '', anniversary: '' });
+      setFormData({ name: '', email: '', phone: '', apartment: '' });
+      setBDay('');
+      setBMonth('');
+      setADay('');
+      setAMonth('');
     }
     setIsModalOpen(true);
   };
@@ -85,15 +114,22 @@ const Customers: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Construct Date Strings (Using Year 2000 as dummy leap year to support all dates)
+    const birthday = (bMonth && bDay) ? `2000-${bMonth.padStart(2, '0')}-${bDay.padStart(2, '0')}` : '';
+    const anniversary = (aMonth && aDay) ? `2000-${aMonth.padStart(2, '0')}-${aDay.padStart(2, '0')}` : '';
+
     let updated;
+    const finalData = { ...formData, birthday, anniversary };
+
     if (editingCustomer) {
         updated = customers.map(c => c.id === editingCustomer.id ? { 
-            ...c, ...formData 
+            ...c, ...finalData 
         } : c);
     } else {
         const newCustomer: Customer = {
           id: crypto.randomUUID(),
-          ...formData,
+          ...finalData,
           walletBalance: 0,
           joinDate: new Date().toISOString().split('T')[0]
         };
@@ -105,6 +141,10 @@ const Customers: React.FC = () => {
   };
 
   const handleTopUp = () => {
+      if (!isAdmin) {
+          alert("Only Admins can add wallet balance.");
+          return;
+      }
       if (!editingCustomer || !selectedMembershipId) return;
       const membership = memberships.find(m => m.id === selectedMembershipId);
       if (!membership) return;
@@ -186,6 +226,14 @@ const Customers: React.FC = () => {
   };
 
   const upcomingEvents = getUpcomingCelebrations();
+
+  const months = [
+    { value: '1', label: 'January' }, { value: '2', label: 'February' }, { value: '3', label: 'March' },
+    { value: '4', label: 'April' }, { value: '5', label: 'May' }, { value: '6', label: 'June' },
+    { value: '7', label: 'July' }, { value: '8', label: 'August' }, { value: '9', label: 'September' },
+    { value: '10', label: 'October' }, { value: '11', label: 'November' }, { value: '12', label: 'December' }
+  ];
+  const days = Array.from({ length: 31 }, (_, i) => i + 1);
 
   return (
     <div>
@@ -364,18 +412,37 @@ const Customers: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700">Apartment Name / Address</label>
                 <input type="text" value={formData.apartment} onChange={e => setFormData({...formData, apartment: e.target.value})} className="mt-1 block w-full border p-2 rounded-md border-gray-300" />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-                 <div>
-                    <label className="block text-sm font-medium text-gray-700">Birthday</label>
-                    <input type="date" value={formData.birthday} onChange={e => setFormData({...formData, birthday: e.target.value})} className="mt-1 block w-full border p-2 rounded-md border-gray-300" />
-                    <p className="text-[10px] text-gray-400 mt-1">Day & Month only</p>
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Anniversary</label>
-                    <input type="date" value={formData.anniversary} onChange={e => setFormData({...formData, anniversary: e.target.value})} className="mt-1 block w-full border p-2 rounded-md border-gray-300" />
-                    <p className="text-[10px] text-gray-400 mt-1">Day & Month only</p>
+            
+            {/* Birthday Select */}
+            <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Birthday (Day / Month)</label>
+                <div className="flex gap-2">
+                    <select value={bDay} onChange={e => setBDay(e.target.value)} className="block w-1/3 border p-2 rounded-md border-gray-300">
+                        <option value="">Day</option>
+                        {days.map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                    <select value={bMonth} onChange={e => setBMonth(e.target.value)} className="block w-2/3 border p-2 rounded-md border-gray-300">
+                        <option value="">Month</option>
+                        {months.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                    </select>
                 </div>
             </div>
+
+            {/* Anniversary Select */}
+            <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Anniversary (Day / Month)</label>
+                <div className="flex gap-2">
+                    <select value={aDay} onChange={e => setADay(e.target.value)} className="block w-1/3 border p-2 rounded-md border-gray-300">
+                        <option value="">Day</option>
+                        {days.map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                    <select value={aMonth} onChange={e => setAMonth(e.target.value)} className="block w-2/3 border p-2 rounded-md border-gray-300">
+                        <option value="">Month</option>
+                        {months.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                    </select>
+                </div>
+            </div>
+
             <div className="mt-5 sm:mt-6">
                 <button type="submit" className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-rose-600 text-base font-medium text-white hover:bg-rose-700">
                   Save Client

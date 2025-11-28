@@ -8,6 +8,7 @@ import Inventory from './components/Inventory';
 import Appointments from './components/Appointments';
 import Sales from './components/Sales';
 import Customers from './components/Customers';
+import Leads from './components/Leads';
 import Memberships from './components/Memberships';
 import Reports from './components/Reports';
 import Notifications from './components/Notifications';
@@ -40,6 +41,7 @@ const App: React.FC = () => {
           <Route path="/appointments" element={<ProtectedRoute><Appointments /></ProtectedRoute>} />
           <Route path="/sales" element={<ProtectedRoute><Sales /></ProtectedRoute>} />
           <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
+          <Route path="/leads" element={<ProtectedRoute><Leads /></ProtectedRoute>} />
           <Route path="/memberships" element={<ProtectedRoute><Memberships /></ProtectedRoute>} />
           <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
           <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />

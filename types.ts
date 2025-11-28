@@ -120,3 +120,26 @@ export interface Notification {
   read: boolean;
   relatedId?: string;
 }
+
+// --- LEADS ---
+
+export type LeadStatus = 'New' | 'Contacted' | 'Interested' | 'Converted' | 'Lost';
+
+export interface LeadComment {
+  id: string;
+  text: string;
+  date: string;
+  author: string;
+}
+
+export interface Lead {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string;
+  source: string; // e.g. Instagram, Referral, Walk-in
+  status: LeadStatus;
+  notes?: string;
+  createdAt: string;
+  comments: LeadComment[];
+}

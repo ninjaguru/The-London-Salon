@@ -1,6 +1,6 @@
 
 import { 
-  Staff, Product, Customer, Appointment, Sale, Membership, Notification, Category, Service,
+  Staff, Product, Customer, Appointment, Sale, Membership, Notification, Category, Service, Lead,
   Role, AppointmentStatus 
 } from '../types';
 
@@ -67,6 +67,31 @@ const INITIAL_CUSTOMERS: Customer[] = [
     walletBalance: 500, membershipId: '1', joinDate: '2023-06-10',
     membershipRenewalDate: '2024-06-10'
   },
+];
+
+const INITIAL_LEADS: Lead[] = [
+  {
+    id: '1', name: 'Sophie Turner', phone: '9988776655', email: 'sophie@test.com', source: 'Instagram', status: 'New', 
+    createdAt: new Date().toISOString(), 
+    comments: [
+      { id: 'c1', text: 'Inquired about Bridal makeup via DM.', date: new Date().toISOString(), author: 'Admin' }
+    ]
+  },
+  {
+    id: '2', name: 'Mike Ross', phone: '1122334455', source: 'Walk-in', status: 'Contacted', 
+    createdAt: new Date(Date.now() - 86400000).toISOString(),
+    comments: [
+      { id: 'c2', text: 'Walked in asking about men\'s packages. Took a brochure.', date: new Date(Date.now() - 86400000).toISOString(), author: 'Manager' },
+      { id: 'c3', text: 'Called to follow up. He said he will visit next week.', date: new Date().toISOString(), author: 'Admin' }
+    ]
+  },
+  {
+    id: '3', name: 'Rachel Zane', phone: '5566778899', source: 'Referral', status: 'Converted', 
+    createdAt: new Date(Date.now() - 172800000).toISOString(),
+    comments: [
+      { id: 'c4', text: 'Referred by Emma Watson.', date: new Date(Date.now() - 172800000).toISOString(), author: 'Manager' }
+    ]
+  }
 ];
 
 const INITIAL_APPOINTMENTS: Appointment[] = [
@@ -156,6 +181,7 @@ export const db = {
   services: new StorageService<Service>('salon_services', INITIAL_SERVICES),
   inventory: new StorageService<Product>('salon_inventory', INITIAL_PRODUCTS),
   customers: new StorageService<Customer>('salon_customers_v3', INITIAL_CUSTOMERS),
+  leads: new StorageService<Lead>('salon_leads', INITIAL_LEADS),
   memberships: new StorageService<Membership>('salon_memberships_v3', INITIAL_MEMBERSHIPS),
   appointments: new StorageService<Appointment>('salon_appointments', INITIAL_APPOINTMENTS),
   sales: new StorageService<Sale>('salon_sales', INITIAL_SALES),

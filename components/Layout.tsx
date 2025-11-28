@@ -16,7 +16,8 @@ import {
   Bell,
   Tags,
   LogOut,
-  Sparkle
+  Sparkle,
+  Target
 } from 'lucide-react';
 import { db, createNotification } from '../services/db';
 import { authService } from '../services/auth';
@@ -110,6 +111,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/appointments', icon: Calendar, label: 'Appointments' },
     { to: '/customers', icon: Users, label: 'Customers' },
+    { to: '/leads', icon: Target, label: 'Leads' },
     { to: '/staff', icon: Scissors, label: 'Staff' },
     { to: '/services', icon: Sparkle, label: 'Services' },
     { to: '/inventory', icon: ShoppingBag, label: 'Inventory' },
