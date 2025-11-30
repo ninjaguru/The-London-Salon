@@ -21,7 +21,8 @@ import {
   MapPin,
   Settings,
   Cloud,
-  FileSpreadsheet
+  FileSpreadsheet,
+  TicketPercent
 } from 'lucide-react';
 import { db, createNotification, syncFromCloud } from '../services/db';
 import { authService } from '../services/auth';
@@ -185,6 +186,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { to: '/services', icon: Sparkle, label: 'Services' },
     { to: '/inventory', icon: ShoppingBag, label: 'Inventory' },
     { to: '/categories', icon: Tags, label: 'Categories' },
+    { to: '/coupons', icon: TicketPercent, label: 'Coupons' },
     { to: '/sales', icon: CreditCard, label: 'Sales' },
     { to: '/memberships', icon: Crown, label: 'Memberships' },
     { to: '/reports', icon: BarChart2, label: 'Reports' },
@@ -216,15 +218,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       {/* Sidebar - Desktop */}
       <aside className="hidden md:flex md:flex-col w-64 bg-white border-r border-gray-200">
-        <div className="flex flex-col items-center justify-center min-h-[7rem] border-b border-gray-100 p-4">
-          <img src="/logo.png" alt="The London Salon" className="h-20 w-auto object-contain transition-all duration-300" onError={(e) => {
-              // Fallback if logo missing
-              e.currentTarget.style.display = 'none';
-              e.currentTarget.nextElementSibling?.classList.remove('hidden');
-          }}/>
-          <h1 className="text-xl font-bold bg-gradient-to-r from-rose-500 to-purple-600 bg-clip-text text-transparent hidden text-center mt-2">
-            The London Salon
-          </h1>
+        <div className="flex flex-col items-center justify-center h-28 border-b border-gray-100 p-4 bg-white">
+          <img 
+            src="/logo.png" 
+            alt="The London Salon" 
+            className="h-full w-auto object-contain transition-all duration-300" 
+          />
         </div>
         <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
           {navItems.map((item) => (
@@ -287,8 +286,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </button>
             </div>
             <div className="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
-              <div className="flex-shrink-0 flex items-center justify-center px-4 mb-4 border-b border-gray-100 pb-4">
-                 <img src="/logo.png" alt="The London Salon" className="h-12 w-auto" />
+              <div className="flex-shrink-0 flex items-center justify-center px-4 mb-4 border-b border-gray-100 pb-4 h-24">
+                 <img src="/logo.png" alt="The London Salon" className="h-full w-auto object-contain" />
               </div>
               <nav className="mt-2 px-2 space-y-1">
                 {navItems.map((item) => (

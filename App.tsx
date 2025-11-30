@@ -15,6 +15,7 @@ import Notifications from './components/Notifications';
 import AIAssistant from './components/AIAssistant';
 import Categories from './components/Categories';
 import Services from './components/Services';
+import Coupons from './components/Coupons';
 import Settings from './components/Settings';
 import Login from './components/Login';
 import { authService } from './services/auth';
@@ -39,6 +40,7 @@ const App: React.FC = () => {
           <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
           <Route path="/categories" element={<ProtectedRoute><Categories /></ProtectedRoute>} />
           <Route path="/services" element={<ProtectedRoute><Services /></ProtectedRoute>} />
+          <Route path="/coupons" element={<ProtectedRoute><Coupons /></ProtectedRoute>} />
           <Route path="/appointments" element={<ProtectedRoute><Appointments /></ProtectedRoute>} />
           <Route path="/sales" element={<ProtectedRoute><Sales /></ProtectedRoute>} />
           <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />

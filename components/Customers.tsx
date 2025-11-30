@@ -2,21 +2,28 @@
 import React, { useState, useEffect } from 'react';
 import { db, exportToCSV, getTodayIST } from '../services/db';
 import { authService } from '../services/auth';
-import { Customer, Membership, Sale } from '../types';
-import { Plus, Search, Mail, Phone, User, Download, Home, Cake, Heart, Wallet, CreditCard, Gift, Clock, AlertCircle, Crown, History } from 'lucide-react';
+import { Customer, Membership, Sale, CouponTemplate, CustomerCoupon } from '../types';
+import { Plus, Search, Mail, Phone, User, Download, Home, Cake, Heart, Wallet, CreditCard, Gift, Clock, AlertCircle, Crown, History, TicketPercent, CheckCircle } from 'lucide-react';
 import Modal from './ui/Modal';
 
 const Customers: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<'all' | 'upcoming'>('all');
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [memberships, setMemberships] = useState<Membership[]>([]);
+  const [coupons, setCoupons] = useState<CouponTemplate[]>([]);
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [isCouponModalOpen, setIsCouponModalOpen] = useState(false);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [historyCustomer, setHistoryCustomer] = useState<Customer | null>(null);
   const [customerHistory, setCustomerHistory] = useState<Array<{date: string, type: string, details: string, amount: number}>>([]);
+
+  // Coupon Assignment State
+  const [selectedCouponTemplateId, setSelectedCouponTemplateId] = useState('');
 
   const user = authService.getCurrentUser();
   const isAdmin = user?.role === 'Admin';
@@ -38,6 +45,7 @@ const Customers: React.FC = () => {
   useEffect(() => {
     setCustomers(db.customers.getAll());
     setMemberships(db.memberships.getAll());
+    setCoupons(db.couponTemplates.getAll());
   }, []);
 
   const openModal = (customer?: Customer) => {
@@ -87,6 +95,12 @@ const Customers: React.FC = () => {
       setIsWalletModalOpen(true);
   };
 
+  const openCouponModal = (customer: Customer) => {
+      setEditingCustomer(customer);
+      setSelectedCouponTemplateId('');
+      setIsCouponModalOpen(true);
+  };
+
   const openHistoryModal = (customer: Customer) => {
       setHistoryCustomer(customer);
       
@@ -131,7 +145,8 @@ const Customers: React.FC = () => {
           id: crypto.randomUUID(),
           ...finalData,
           walletBalance: 0,
-          joinDate: getTodayIST()
+          joinDate: getTodayIST(),
+          activeCoupons: []
         };
         updated = [...customers, newCustomer];
     }
@@ -181,18 +196,48 @@ const Customers: React.FC = () => {
       setIsWalletModalOpen(false);
   };
 
+  const handleAssignCoupon = () => {
+      if (!editingCustomer || !selectedCouponTemplateId) return;
+      const template = coupons.find(c => c.id === selectedCouponTemplateId);
+      if (!template) return;
+
+      const expiryDate = new Date();
+      expiryDate.setDate(expiryDate.getDate() + template.validityDays);
+
+      const newCoupon: CustomerCoupon = {
+          id: crypto.randomUUID(),
+          templateId: template.id,
+          name: template.name,
+          code: template.code,
+          description: template.description,
+          assignedDate: new Date().toISOString(),
+          expiryDate: expiryDate.toISOString(),
+          isRedeemed: false
+      };
+
+      const currentCoupons = editingCustomer.activeCoupons || [];
+      const updatedCustomers = customers.map(c => c.id === editingCustomer.id ? {
+          ...c,
+          activeCoupons: [...currentCoupons, newCoupon]
+      } : c);
+
+      setCustomers(updatedCustomers);
+      db.customers.save(updatedCustomers);
+      setIsCouponModalOpen(false);
+  };
+
   const filteredCustomers = customers.filter(c => 
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     c.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.phone.includes(searchTerm)
   );
 
-  // Logic for Upcoming Birthdays & Anniversaries (Next 7 Days)
-  const getUpcomingCelebrations = () => {
+  // Logic for Upcoming Birthdays & Anniversaries (Next 30 Days for the tab view)
+  const getUpcomingEvents = (daysToCheck: number) => {
     const today = new Date();
     today.setHours(0,0,0,0);
-    const nextWeek = new Date(today);
-    nextWeek.setDate(today.getDate() + 7);
+    const endDate = new Date(today);
+    endDate.setDate(today.getDate() + daysToCheck);
 
     return customers.filter(c => {
         let hasEvent = false;
@@ -202,7 +247,11 @@ const Customers: React.FC = () => {
             const d = new Date(dateStr);
             // Construct current year date
             const currentYearDate = new Date(today.getFullYear(), d.getMonth(), d.getDate());
-            return currentYearDate >= today && currentYearDate <= nextWeek;
+            // Check next year as well to handle Dec -> Jan transition
+            const nextYearDate = new Date(today.getFullYear() + 1, d.getMonth(), d.getDate());
+            
+            return (currentYearDate >= today && currentYearDate <= endDate) || 
+                   (nextYearDate >= today && nextYearDate <= endDate);
         };
 
         if (checkDate(c.birthday)) hasEvent = true;
@@ -215,17 +264,26 @@ const Customers: React.FC = () => {
              if (!dateStr) return;
              const d = new Date(dateStr);
              const currentYearDate = new Date(today.getFullYear(), d.getMonth(), d.getDate());
-             if (currentYearDate >= today && currentYearDate <= nextWeek) {
+             const nextYearDate = new Date(today.getFullYear() + 1, d.getMonth(), d.getDate());
+             
+             if (currentYearDate >= today && currentYearDate <= endDate) {
                  events.push({ type, date: currentYearDate });
+             } else if (nextYearDate >= today && nextYearDate <= endDate) {
+                 events.push({ type, date: nextYearDate });
              }
         };
         checkDate(c.birthday, 'Birthday');
         checkDate(c.anniversary, 'Anniversary');
+        events.sort((a,b) => a.date.getTime() - b.date.getTime());
         return { customer: c, events };
+    }).sort((a,b) => {
+        const dateA = a.events[0]?.date.getTime() || 0;
+        const dateB = b.events[0]?.date.getTime() || 0;
+        return dateA - dateB;
     });
   };
 
-  const upcomingEvents = getUpcomingCelebrations();
+  const upcomingEvents = getUpcomingEvents(30);
 
   const months = [
     { value: '1', label: 'January' }, { value: '2', label: 'February' }, { value: '3', label: 'March' },
@@ -237,32 +295,6 @@ const Customers: React.FC = () => {
 
   return (
     <div>
-      {/* Upcoming Celebrations Widget */}
-      {upcomingEvents.length > 0 && (
-          <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 rounded-lg p-4 mb-6 shadow-sm">
-             <h3 className="text-lg font-bold text-indigo-900 mb-3 flex items-center">
-                 <Gift className="w-5 h-5 mr-2 text-indigo-600" /> Upcoming Celebrations (Next 7 Days)
-             </h3>
-             <div className="flex flex-wrap gap-4">
-                 {upcomingEvents.map(({customer, events}, idx) => (
-                     events.map((evt, eIdx) => (
-                        <div key={`${idx}-${eIdx}`} className="bg-white p-3 rounded-md shadow-sm border border-indigo-100 flex items-center space-x-3">
-                            <div className="bg-indigo-100 p-2 rounded-full">
-                                {evt.type === 'Birthday' ? <Cake size={16} className="text-indigo-600"/> : <Heart size={16} className="text-rose-500"/>}
-                            </div>
-                            <div>
-                                <p className="text-sm font-bold text-gray-800">{customer.name}</p>
-                                <p className="text-xs text-gray-500">
-                                    {evt.type} on {evt.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                </p>
-                            </div>
-                        </div>
-                     ))
-                 ))}
-             </div>
-          </div>
-      )}
-
       <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
         <h2 className="text-2xl font-bold text-gray-800">Clientele</h2>
         <div className="flex w-full sm:w-auto gap-2">
@@ -293,103 +325,198 @@ const Customers: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredCustomers.map(customer => {
-             const membership = memberships.find(m => m.id === customer.membershipId);
-             // Check expiry
-             const expiryDate = customer.membershipRenewalDate ? new Date(customer.membershipRenewalDate) : null;
-             const daysToExpiry = expiryDate ? Math.ceil((expiryDate.getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : null;
-             const isExpiringSoon = daysToExpiry !== null && daysToExpiry <= 30 && daysToExpiry > 0;
-             const isExpired = daysToExpiry !== null && daysToExpiry <= 0;
-
-             return (
-            <div key={customer.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 flex flex-col cursor-pointer hover:shadow-md transition">
-                <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center">
-                        <div className="h-12 w-12 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">
-                            <User size={24} />
-                        </div>
-                        <div className="ml-4">
-                            <h3 className="text-lg font-bold text-gray-900">{customer.name}</h3>
-                            <button 
-                                onClick={(e) => { e.stopPropagation(); openModal(customer); }} 
-                                className="text-xs text-indigo-600 hover:text-indigo-800 underline"
-                            >
-                                Edit
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg p-3 mb-4 border border-gray-200 flex justify-between items-center relative overflow-hidden">
-                    <div>
-                        <p className="text-xs text-gray-500 uppercase font-semibold">Wallet Balance</p>
-                        <p className="text-xl font-bold text-gray-900">₹{customer.walletBalance.toLocaleString()}</p>
-                    </div>
-                    {isAdmin && (
-                        <button 
-                            onClick={(e) => { e.stopPropagation(); openWalletModal(customer); }}
-                            className="bg-white border border-gray-300 p-2 rounded-full hover:bg-gray-50 text-green-600 z-10"
-                            title="Top Up Wallet"
-                        >
-                            <Wallet size={18} />
-                        </button>
-                    )}
-                    {membership && (
-                         <div className="absolute right-14 top-2 opacity-10">
-                             <Crown size={40} />
-                         </div>
-                    )}
-                </div>
-                
-                {membership && expiryDate && (
-                    <div className={`mb-4 text-xs rounded-md p-2 flex items-center ${isExpired ? 'bg-red-50 text-red-700' : isExpiringSoon ? 'bg-amber-50 text-amber-700' : 'bg-blue-50 text-blue-700'}`}>
-                         {isExpired ? <AlertCircle size={14} className="mr-2"/> : <Clock size={14} className="mr-2"/>}
-                         <span>
-                             {isExpired ? 'Expired on ' : 'Expires: '}
-                             {expiryDate.toLocaleDateString()}
-                         </span>
-                    </div>
-                )}
-                
-                <div className="space-y-2 mt-auto">
-                    <div className="flex items-center text-gray-600 text-sm">
-                        <Mail size={16} className="mr-2 text-gray-400" /> {customer.email || <span className="text-gray-400 italic">No email</span>}
-                    </div>
-                    <div className="flex items-center text-gray-600 text-sm">
-                        <Phone size={16} className="mr-2 text-gray-400" /> {customer.phone}
-                    </div>
-                    {customer.apartment && (
-                        <div className="flex items-center text-gray-600 text-sm">
-                            <Home size={16} className="mr-2 text-gray-400" /> {customer.apartment}
-                        </div>
-                    )}
-                    <div className="flex gap-4 pt-2 border-t border-gray-100">
-                        {customer.birthday && (
-                            <div className="flex items-center text-gray-600 text-sm" title="Birthday">
-                                <Cake size={16} className="mr-2 text-rose-400" /> 
-                                {new Date(customer.birthday).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                            </div>
-                        )}
-                        {customer.anniversary && (
-                             <div className="flex items-center text-gray-600 text-sm" title="Anniversary">
-                                <Heart size={16} className="mr-2 text-rose-400" /> 
-                                {new Date(customer.anniversary).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                            </div>
-                        )}
-                    </div>
-                </div>
-                <div className="mt-4 pt-3 border-t border-gray-100">
-                     <button 
-                        onClick={(e) => { e.stopPropagation(); openHistoryModal(customer); }}
-                        className="w-full flex items-center justify-center py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-md transition-colors border border-gray-200"
-                     >
-                         <History size={16} className="mr-2" /> View Service History
-                     </button>
-                </div>
-            </div>
-        )})}
+      <div className="border-b border-gray-200 mb-6">
+        <nav className="-mb-px flex space-x-8">
+            <button
+              onClick={() => setActiveTab('all')}
+              className={`${
+                activeTab === 'all'
+                  ? 'border-rose-500 text-rose-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+            >
+              All Clients
+            </button>
+            <button
+              onClick={() => setActiveTab('upcoming')}
+              className={`${
+                activeTab === 'upcoming'
+                  ? 'border-rose-500 text-rose-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center`}
+            >
+              <Gift size={16} className="mr-2"/> Upcoming Events
+              <span className="ml-2 bg-rose-100 text-rose-600 px-2 py-0.5 rounded-full text-xs">
+                  {upcomingEvents.length}
+              </span>
+            </button>
+        </nav>
       </div>
+
+      {activeTab === 'all' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredCustomers.map(customer => {
+                const membership = memberships.find(m => m.id === customer.membershipId);
+                // Check expiry
+                const expiryDate = customer.membershipRenewalDate ? new Date(customer.membershipRenewalDate) : null;
+                const daysToExpiry = expiryDate ? Math.ceil((expiryDate.getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : null;
+                const isExpiringSoon = daysToExpiry !== null && daysToExpiry <= 30 && daysToExpiry > 0;
+                const isExpired = daysToExpiry !== null && daysToExpiry <= 0;
+                
+                // Active Coupons Count
+                const activeCoupons = customer.activeCoupons?.filter(c => !c.isRedeemed && new Date(c.expiryDate) > new Date()) || [];
+
+                return (
+                <div key={customer.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 flex flex-col cursor-pointer hover:shadow-md transition">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center">
+                            <div className="h-12 w-12 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">
+                                <User size={24} />
+                            </div>
+                            <div className="ml-4">
+                                <h3 className="text-lg font-bold text-gray-900">{customer.name}</h3>
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); openModal(customer); }} 
+                                    className="text-xs text-indigo-600 hover:text-indigo-800 underline"
+                                >
+                                    Edit
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg p-3 mb-4 border border-gray-200 flex justify-between items-center relative overflow-hidden">
+                        <div>
+                            <p className="text-xs text-gray-500 uppercase font-semibold">Wallet Balance</p>
+                            <p className="text-xl font-bold text-gray-900">₹{customer.walletBalance.toLocaleString()}</p>
+                        </div>
+                        {isAdmin && (
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); openWalletModal(customer); }}
+                                className="bg-white border border-gray-300 p-2 rounded-full hover:bg-gray-50 text-green-600 z-10"
+                                title="Top Up Wallet"
+                            >
+                                <Wallet size={18} />
+                            </button>
+                        )}
+                        {membership && (
+                            <div className="absolute right-14 top-2 opacity-10">
+                                <Crown size={40} />
+                            </div>
+                        )}
+                    </div>
+                    
+                    {membership && expiryDate && (
+                        <div className={`mb-4 text-xs rounded-md p-2 flex items-center ${isExpired ? 'bg-red-50 text-red-700' : isExpiringSoon ? 'bg-amber-50 text-amber-700' : 'bg-blue-50 text-blue-700'}`}>
+                            {isExpired ? <AlertCircle size={14} className="mr-2"/> : <Clock size={14} className="mr-2"/>}
+                            <span>
+                                {isExpired ? 'Expired on ' : 'Expires: '}
+                                {expiryDate.toLocaleDateString()}
+                            </span>
+                        </div>
+                    )}
+
+                    {/* Active Coupons Section */}
+                    {activeCoupons.length > 0 && (
+                        <div className="mb-4">
+                            <p className="text-xs font-semibold text-gray-500 mb-1">Active Coupons</p>
+                            <div className="flex flex-wrap gap-2">
+                                {activeCoupons.map((c) => (
+                                    <div key={c.id} className="flex items-center bg-purple-50 border border-purple-100 text-purple-700 text-xs px-2 py-1 rounded">
+                                        <TicketPercent size={12} className="mr-1" />
+                                        <span className="font-mono font-bold mr-1">{c.code}</span>
+                                        <span className="text-[10px] text-purple-400">(Exp: {new Date(c.expiryDate).toLocaleDateString()})</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    
+                    <div className="space-y-2 mt-auto">
+                        <div className="flex items-center text-gray-600 text-sm">
+                            <Mail size={16} className="mr-2 text-gray-400" /> {customer.email || <span className="text-gray-400 italic">No email</span>}
+                        </div>
+                        <div className="flex items-center text-gray-600 text-sm">
+                            <Phone size={16} className="mr-2 text-gray-400" /> {customer.phone}
+                        </div>
+                        {customer.apartment && (
+                            <div className="flex items-center text-gray-600 text-sm">
+                                <Home size={16} className="mr-2 text-gray-400" /> {customer.apartment}
+                            </div>
+                        )}
+                        <div className="flex gap-4 pt-2 border-t border-gray-100">
+                            {customer.birthday && (
+                                <div className="flex items-center text-gray-600 text-sm" title="Birthday">
+                                    <Cake size={16} className="mr-2 text-rose-400" /> 
+                                    {new Date(customer.birthday).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                </div>
+                            )}
+                            {customer.anniversary && (
+                                <div className="flex items-center text-gray-600 text-sm" title="Anniversary">
+                                    <Heart size={16} className="mr-2 text-rose-400" /> 
+                                    {new Date(customer.anniversary).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    <div className="mt-4 pt-3 border-t border-gray-100 flex gap-2">
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); openHistoryModal(customer); }}
+                            className="flex-1 flex items-center justify-center py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-md transition-colors border border-gray-200"
+                        >
+                            <History size={16} className="mr-2" /> History
+                        </button>
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); openCouponModal(customer); }}
+                            className="flex-1 flex items-center justify-center py-2 text-sm text-purple-600 hover:bg-purple-50 rounded-md transition-colors border border-purple-200 font-medium"
+                        >
+                            <TicketPercent size={16} className="mr-2" /> Coupon
+                        </button>
+                    </div>
+                </div>
+            )})}
+        </div>
+      )}
+
+      {activeTab === 'upcoming' && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+              <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                  <h3 className="font-bold text-gray-700">Birthdays & Anniversaries (Next 30 Days)</h3>
+                  <span className="text-xs text-gray-500">Sorted by upcoming date</span>
+              </div>
+              <ul className="divide-y divide-gray-100">
+                  {upcomingEvents.map(({customer, events}, idx) => (
+                      <li key={idx} className="p-4 hover:bg-gray-50 flex items-center justify-between">
+                          <div className="flex items-center">
+                               <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 mr-4">
+                                    <User size={20} />
+                               </div>
+                               <div>
+                                   <p className="font-bold text-gray-900">{customer.name}</p>
+                                   <div className="text-sm text-gray-500 flex gap-4">
+                                       <span className="flex items-center"><Phone size={12} className="mr-1"/> {customer.phone}</span>
+                                       {customer.apartment && <span className="flex items-center"><Home size={12} className="mr-1"/> {customer.apartment}</span>}
+                                   </div>
+                               </div>
+                          </div>
+                          <div className="flex gap-4">
+                               {events.map((evt, eIdx) => (
+                                   <div key={eIdx} className={`px-3 py-1 rounded-full text-sm font-medium flex items-center ${
+                                       evt.type === 'Birthday' ? 'bg-indigo-100 text-indigo-800' : 'bg-rose-100 text-rose-800'
+                                   }`}>
+                                       {evt.type === 'Birthday' ? <Cake size={14} className="mr-2"/> : <Heart size={14} className="mr-2"/>}
+                                       <span>{evt.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' })}</span>
+                                   </div>
+                               ))}
+                          </div>
+                      </li>
+                  ))}
+                  {upcomingEvents.length === 0 && (
+                      <li className="p-8 text-center text-gray-500 italic">No upcoming events in the next 30 days.</li>
+                  )}
+              </ul>
+          </div>
+      )}
 
       {/* Edit/Create Modal */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingCustomer ? "Edit Client" : "New Client"}>
@@ -493,6 +620,46 @@ const Customers: React.FC = () => {
                 </button>
             </div>
         </div>
+      </Modal>
+
+      {/* Coupon Modal */}
+      <Modal isOpen={isCouponModalOpen} onClose={() => setIsCouponModalOpen(false)} title="Assign Coupon">
+         <div className="space-y-4">
+             <p className="text-sm text-gray-600">Select a coupon to add to <span className="font-bold">{editingCustomer?.name}</span>.</p>
+             <div className="space-y-3 max-h-60 overflow-y-auto">
+                 {coupons.map(coupon => (
+                     <div 
+                        key={coupon.id}
+                        onClick={() => setSelectedCouponTemplateId(coupon.id)}
+                        className={`border rounded-lg p-3 cursor-pointer flex justify-between items-center ${selectedCouponTemplateId === coupon.id ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:bg-gray-50'}`}
+                     >
+                         <div>
+                             <p className="font-bold text-gray-900">{coupon.name}</p>
+                             <p className="text-xs text-gray-500 font-mono bg-gray-100 inline-block px-1 rounded">{coupon.code}</p>
+                             <p className="text-xs text-gray-500 mt-1">{coupon.description}</p>
+                         </div>
+                         <div className="text-right">
+                             <span className="block font-bold text-purple-600 text-lg">
+                                 {coupon.discountType === 'Percentage' ? `${coupon.value}%` : `₹${coupon.value}`}
+                             </span>
+                             <span className="text-[10px] text-gray-400">Valid {coupon.validityDays} days</span>
+                         </div>
+                     </div>
+                 ))}
+                 {coupons.length === 0 && (
+                     <p className="text-gray-500 italic text-center text-sm">No active coupon templates available.</p>
+                 )}
+             </div>
+             <div className="mt-5 sm:mt-6">
+                <button 
+                    onClick={handleAssignCoupon}
+                    disabled={!selectedCouponTemplateId}
+                    className="w-full inline-flex justify-center items-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-purple-600 text-base font-medium text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <TicketPercent className="mr-2 w-4 h-4" /> Assign Coupon
+                </button>
+            </div>
+         </div>
       </Modal>
 
       {/* History Modal */}

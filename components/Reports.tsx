@@ -5,12 +5,12 @@ import {
   PieChart, Pie, Cell, LineChart, Line, Legend
 } from 'recharts';
 import { db, exportToCSV, getTodayIST } from '../services/db';
-import { Download, Calendar } from 'lucide-react';
+import { Download, Calendar, Search } from 'lucide-react';
 
 const COLORS = ['#e11d48', '#8b5cf6', '#f59e0b', '#10b981', '#3b82f6'];
 
 const Reports: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'sales' | 'customers' | 'inventory'>('sales');
+  const [activeTab, setActiveTab] = useState<'sales' | 'customers' | 'inventory' | 'services'>('sales');
   
   // Date Filters - Default: 1st of current month to Today (IST)
   const getFirstDayOfMonth = () => {
@@ -22,10 +22,15 @@ const Reports: React.FC = () => {
   const [startDate, setStartDate] = useState(getFirstDayOfMonth());
   const [endDate, setEndDate] = useState(getTodayIST());
 
+  // Service Report Filters
+  const [serviceNameFilter, setServiceNameFilter] = useState('');
+  const [customerNameFilter, setCustomerNameFilter] = useState('');
+
   const allSales = db.sales.getAll();
   const allAppointments = db.appointments.getAll();
   const customers = db.customers.getAll();
   const inventory = db.inventory.getAll();
+  const staff = db.staff.getAll();
 
   // FILTER DATA
   const sales = allSales.filter(s => s.date.split('T')[0] >= startDate && s.date.split('T')[0] <= endDate);
@@ -116,10 +121,34 @@ const Reports: React.FC = () => {
   });
   const stockValueData = Array.from(stockValueByCategoryMap.entries()).map(([name, value]) => ({ name, value }));
 
+  // --- SERVICE HISTORY REPORT ---
+  const getFilteredServiceHistory = () => {
+    // Start with all completed appointments in date range
+    let filtered = appointments.filter(a => a.status === 'Completed');
+
+    if (serviceNameFilter) {
+        filtered = filtered.filter(a => a.serviceName.toLowerCase().includes(serviceNameFilter.toLowerCase()));
+    }
+
+    if (customerNameFilter) {
+        // Need to join with customer data
+        filtered = filtered.filter(a => {
+            const customer = customers.find(c => c.id === a.customerId);
+            return customer && customer.name.toLowerCase().includes(customerNameFilter.toLowerCase());
+        });
+    }
+
+    // Sort by date desc
+    return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  };
+
+  const serviceHistory = getFilteredServiceHistory();
+
   const handleExport = () => {
       if (activeTab === 'sales') exportToCSV(revenueData, 'revenue_report');
       else if (activeTab === 'customers') exportToCSV(customers, 'customer_report');
       else if (activeTab === 'inventory') exportToCSV(inventory, 'inventory_report');
+      else if (activeTab === 'services') exportToCSV(serviceHistory, 'services_history_report');
   };
 
   return (
@@ -163,7 +192,7 @@ const Reports: React.FC = () => {
 
       <div className="border-b border-gray-200">
         <nav className="-mb-px flex space-x-8">
-          {['sales', 'customers', 'inventory'].map((tab) => (
+          {['sales', 'customers', 'inventory', 'services'].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab as any)}
@@ -377,6 +406,76 @@ const Reports: React.FC = () => {
                     </tbody>
                 </table>
              </div>
+          </div>
+      )}
+
+      {activeTab === 'services' && (
+          <div className="space-y-6">
+              <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">Detailed Service History</h3>
+                  <div className="flex flex-col md:flex-row gap-4 mb-4">
+                      <div className="flex-1">
+                          <label className="block text-xs font-medium text-gray-500 mb-1">Search Service Name</label>
+                          <div className="relative">
+                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                              <input 
+                                  type="text" 
+                                  placeholder="e.g. Pedicure"
+                                  value={serviceNameFilter}
+                                  onChange={e => setServiceNameFilter(e.target.value)}
+                                  className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-md text-sm"
+                              />
+                          </div>
+                      </div>
+                      <div className="flex-1">
+                          <label className="block text-xs font-medium text-gray-500 mb-1">Search Customer Name</label>
+                          <div className="relative">
+                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                              <input 
+                                  type="text" 
+                                  placeholder="e.g. John Doe"
+                                  value={customerNameFilter}
+                                  onChange={e => setCustomerNameFilter(e.target.value)}
+                                  className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-md text-sm"
+                              />
+                          </div>
+                      </div>
+                  </div>
+                  
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                            <tr>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Service</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stylist</th>
+                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Price</th>
+                            </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                            {serviceHistory.map((appt) => {
+                                const customer = customers.find(c => c.id === appt.customerId);
+                                const stylist = staff.find(s => s.id === appt.staffId);
+                                return (
+                                    <tr key={appt.id} className="hover:bg-gray-50">
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(appt.date).toLocaleDateString()}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{customer?.name || 'Unknown'}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{appt.serviceName}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{stylist?.name || 'Unknown'}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right">₹{appt.price}</td>
+                                    </tr>
+                                );
+                            })}
+                            {serviceHistory.length === 0 && (
+                                <tr>
+                                    <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">No services found matching filters.</td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                  </div>
+              </div>
           </div>
       )}
     </div>

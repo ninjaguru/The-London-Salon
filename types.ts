@@ -52,6 +52,27 @@ export interface Product {
   minThreshold: number;
 }
 
+export interface CouponTemplate {
+  id: string;
+  name: string;
+  code: string;
+  discountType: 'Percentage' | 'Fixed';
+  value: number;
+  validityDays: number;
+  description: string;
+}
+
+export interface CustomerCoupon {
+  id: string;
+  templateId: string;
+  name: string;
+  code: string;
+  description: string;
+  assignedDate: string;
+  expiryDate: string;
+  isRedeemed: boolean;
+}
+
 export interface Customer {
   id: string;
   name: string;
@@ -65,6 +86,7 @@ export interface Customer {
   walletBalance: number; // Current credit balance
   joinDate: string;
   notes?: string;
+  activeCoupons: CustomerCoupon[];
 }
 
 export enum AppointmentStatus {

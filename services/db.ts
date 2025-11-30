@@ -1,6 +1,6 @@
 
 import { 
-  Staff, Product, Customer, Appointment, Sale, Membership, Notification, Category, Service, Lead,
+  Staff, Product, Customer, Appointment, Sale, Membership, Notification, Category, Service, Lead, CouponTemplate,
   Role, AppointmentStatus 
 } from '../types';
 import { sheetsService } from './sheets';
@@ -16,6 +16,7 @@ const INITIAL_LEADS: Lead[] = [];
 const INITIAL_APPOINTMENTS: Appointment[] = [];
 const INITIAL_SALES: Sale[] = [];
 const INITIAL_NOTIFICATIONS: Notification[] = [];
+const INITIAL_COUPON_TEMPLATES: CouponTemplate[] = [];
 
 // Helper to manage generic CRUD
 class StorageService<T> {
@@ -74,6 +75,7 @@ export const db = {
   appointments: new StorageService<Appointment>('salon_appointments_v4_clean', 'Appointments', INITIAL_APPOINTMENTS),
   sales: new StorageService<Sale>('salon_sales_v4_clean', 'Sales', INITIAL_SALES),
   notifications: new StorageService<Notification>('salon_notifications_v4_clean', 'Notifications', INITIAL_NOTIFICATIONS),
+  couponTemplates: new StorageService<CouponTemplate>('salon_coupons_v4_clean', 'CouponTemplates', INITIAL_COUPON_TEMPLATES),
 };
 
 // Global Sync Function
@@ -92,6 +94,7 @@ export const syncFromCloud = async (): Promise<{success: boolean, message: strin
     if (data.Appointments) db.appointments.overrideLocal(data.Appointments);
     if (data.Sales) db.sales.overrideLocal(data.Sales);
     if (data.Notifications) db.notifications.overrideLocal(data.Notifications);
+    if (data.CouponTemplates) db.couponTemplates.overrideLocal(data.CouponTemplates);
     
     return { success: true, message: 'Data synced from cloud successfully' };
   } else {

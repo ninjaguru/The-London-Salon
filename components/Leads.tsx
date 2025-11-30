@@ -130,7 +130,8 @@ const Leads: React.FC = () => {
          anniversary: '',
          walletBalance: 0,
          joinDate: new Date().toISOString().split('T')[0],
-         notes: `Converted from Lead. Source: ${editingLead.source}. Notes: ${editingLead.notes}`
+         notes: `Converted from Lead. Source: ${editingLead.source}. Notes: ${editingLead.notes}`,
+         activeCoupons: []
        };
        db.customers.add(newCustomer);
 
