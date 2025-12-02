@@ -6,10 +6,10 @@ import { Package } from '../types';
 import { Crown, Check, Plus, Edit2, Trash2, Download, Wallet, Calendar, Gift } from 'lucide-react';
 import Modal from './ui/Modal';
 
-const Memberships: React.FC = () => {
-  const [tiers, setTiers] = useState<Package[]>([]);
+const Packages: React.FC = () => {
+  const [packages, setPackages] = useState<Package[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingTier, setEditingTier] = useState<Package | null>(null);
+  const [editingPackage, setEditingPackage] = useState<Package | null>(null);
 
   const user = authService.getCurrentUser();
   const isAdmin = user?.role === 'Admin';
@@ -25,22 +25,22 @@ const Memberships: React.FC = () => {
   });
 
   useEffect(() => {
-    setTiers(db.packages.getAll());
+    setPackages(db.packages.getAll());
   }, []);
 
-  const openModal = (tier?: Package) => {
-      if (tier) {
-          setEditingTier(tier);
+  const openModal = (pkg?: Package) => {
+      if (pkg) {
+          setEditingPackage(pkg);
           setFormData({
-              name: tier.name,
-              cost: tier.cost,
-              creditValue: tier.creditValue,
-              description: tier.description,
-              validityMonths: tier.validityMonths || 12,
-              complimentaryServices: tier.complimentaryServices ? tier.complimentaryServices.join(', ') : ''
+              name: pkg.name,
+              cost: pkg.cost,
+              creditValue: pkg.creditValue,
+              description: pkg.description,
+              validityMonths: pkg.validityMonths || 12,
+              complimentaryServices: pkg.complimentaryServices ? pkg.complimentaryServices.join(', ') : ''
           });
       } else {
-          setEditingTier(null);
+          setEditingPackage(null);
           setFormData({ name: '', cost: 0, creditValue: 0, description: '', validityMonths: 12, complimentaryServices: '' });
       }
       setIsModalOpen(true);
@@ -51,19 +51,19 @@ const Memberships: React.FC = () => {
       
       const services = formData.complimentaryServices.split(',').map(s => s.trim()).filter(Boolean);
 
-      let updatedTiers;
-      if (editingTier) {
-          updatedTiers = tiers.map(t => t.id === editingTier.id ? { 
-              ...t, 
+      let updatedPackages;
+      if (editingPackage) {
+          updatedPackages = packages.map(p => p.id === editingPackage.id ? { 
+              ...p, 
               name: formData.name, 
               cost: Number(formData.cost), 
               creditValue: Number(formData.creditValue),
               description: formData.description,
               validityMonths: Number(formData.validityMonths),
               complimentaryServices: services
-            } : t);
+            } : p);
       } else {
-          const newTier: Package = {
+          const newPackage: Package = {
               id: crypto.randomUUID(),
               name: formData.name,
               cost: Number(formData.cost),
@@ -72,17 +72,17 @@ const Memberships: React.FC = () => {
               validityMonths: Number(formData.validityMonths),
               complimentaryServices: services
           };
-          updatedTiers = [...tiers, newTier];
+          updatedPackages = [...packages, newPackage];
       }
-      setTiers(updatedTiers);
-      db.packages.save(updatedTiers);
+      setPackages(updatedPackages);
+      db.packages.save(updatedPackages);
       setIsModalOpen(false);
   };
 
   const handleDelete = (id: string) => {
-      if (confirm('Delete this membership tier? Clients on this tier will need manual updating.')) {
-          const updated = tiers.filter(t => t.id !== id);
-          setTiers(updated);
+      if (confirm('Delete this package? Clients on this package will need manual updating.')) {
+          const updated = packages.filter(p => p.id !== id);
+          setPackages(updated);
           db.packages.save(updated);
       }
   };
@@ -90,10 +90,10 @@ const Memberships: React.FC = () => {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">Wallet Memberships</h2>
+        <h2 className="text-2xl font-bold text-gray-800">Wallet Packages</h2>
         <div className="flex gap-2">
             <button 
-                onClick={() => exportToCSV(tiers, 'packages')}
+                onClick={() => exportToCSV(packages, 'packages')}
                 className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm"
             >
                 <Download className="w-4 h-4 mr-2" /> Export
@@ -110,52 +110,52 @@ const Memberships: React.FC = () => {
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {tiers.map((tier) => {
-            const bonus = tier.creditValue - tier.cost;
-            const percent = ((bonus / tier.cost) * 100).toFixed(0);
+        {packages.map((pkg) => {
+            const bonus = pkg.creditValue - pkg.cost;
+            const percent = ((bonus / pkg.cost) * 100).toFixed(0);
 
             return (
-            <div key={tier.id} className="relative bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100 flex flex-col transition hover:shadow-xl">
+            <div key={pkg.id} className="relative bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100 flex flex-col transition hover:shadow-xl">
                 <div className={`h-2 w-full bg-gradient-to-r from-rose-400 to-purple-500`}></div>
                 {isAdmin && (
                     <div className="absolute top-4 right-4 flex space-x-2">
-                        <button onClick={() => openModal(tier)} className="text-gray-400 hover:text-indigo-600 bg-white rounded-full p-1 shadow-sm"><Edit2 size={16}/></button>
-                        <button onClick={() => handleDelete(tier.id)} className="text-gray-400 hover:text-red-600 bg-white rounded-full p-1 shadow-sm"><Trash2 size={16}/></button>
+                        <button onClick={() => openModal(pkg)} className="text-gray-400 hover:text-indigo-600 bg-white rounded-full p-1 shadow-sm"><Edit2 size={16}/></button>
+                        <button onClick={() => handleDelete(pkg.id)} className="text-gray-400 hover:text-red-600 bg-white rounded-full p-1 shadow-sm"><Trash2 size={16}/></button>
                     </div>
                 )}
                 <div className="p-8 flex-1 flex flex-col">
                     <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-xl font-bold text-gray-900">{tier.name}</h3>
+                        <h3 className="text-xl font-bold text-gray-900">{pkg.name}</h3>
                         <Wallet className="h-6 w-6 text-purple-500" />
                     </div>
                     
                     <div className="flex flex-col mb-4">
                         <span className="text-sm text-gray-500">Pay</span>
-                        <span className="text-3xl font-extrabold tracking-tight text-gray-900">₹{tier.cost.toLocaleString()}</span>
+                        <span className="text-3xl font-extrabold tracking-tight text-gray-900">₹{pkg.cost.toLocaleString()}</span>
                     </div>
 
                     <div className="flex items-center space-x-2 bg-green-50 p-2 rounded-lg border border-green-100 mb-4">
                         <Check className="h-5 w-5 text-green-600" />
                         <span className="text-sm font-medium text-green-800">
-                            Get <span className="font-bold">₹{tier.creditValue.toLocaleString()}</span> credit
+                            Get <span className="font-bold">₹{pkg.creditValue.toLocaleString()}</span> credit
                         </span>
                     </div>
                     
-                    <p className="text-sm text-gray-600 italic mb-4">{tier.description}</p>
+                    <p className="text-sm text-gray-600 italic mb-4">{pkg.description}</p>
                     
                     <div className="mb-4 space-y-2">
                         <div className="flex items-center text-sm text-gray-600">
                            <Calendar size={14} className="mr-2 text-indigo-500" />
-                           Validity: <span className="font-semibold ml-1">{tier.validityMonths} Months</span>
+                           Validity: <span className="font-semibold ml-1">{pkg.validityMonths} Months</span>
                         </div>
-                        {tier.complimentaryServices && tier.complimentaryServices.length > 0 && (
+                        {pkg.complimentaryServices && pkg.complimentaryServices.length > 0 && (
                             <div className="text-sm text-gray-600">
                                 <div className="flex items-center mb-1">
                                     <Gift size={14} className="mr-2 text-rose-500" />
                                     <span className="font-semibold">Complimentary:</span>
                                 </div>
                                 <ul className="list-disc pl-8 space-y-1 text-xs text-gray-500">
-                                    {tier.complimentaryServices.map((s, i) => (
+                                    {pkg.complimentaryServices.map((s, i) => (
                                         <li key={i}>{s}</li>
                                     ))}
                                 </ul>
@@ -174,7 +174,7 @@ const Memberships: React.FC = () => {
         })}
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingTier ? "Edit Package" : "Add Membership Package"}>
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingPackage ? "Edit Package" : "Add Wallet Package"}>
         <form onSubmit={handleSubmit} className="space-y-4">
              <div>
                 <label className="block text-sm font-medium text-gray-700">Package Name</label>
@@ -241,4 +241,4 @@ const Memberships: React.FC = () => {
   );
 };
 
-export default Memberships;
+export default Packages;

@@ -9,7 +9,8 @@ import Appointments from './components/Appointments';
 import Sales from './components/Sales';
 import Customers from './components/Customers';
 import Leads from './components/Leads';
-import Memberships from './components/Memberships';
+import Packages from './components/Packages';
+import Combos from './components/Combos';
 import Reports from './components/Reports';
 import Notifications from './components/Notifications';
 import AIAssistant from './components/AIAssistant';
@@ -40,12 +41,13 @@ const App: React.FC = () => {
           <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
           <Route path="/categories" element={<ProtectedRoute><Categories /></ProtectedRoute>} />
           <Route path="/services" element={<ProtectedRoute><Services /></ProtectedRoute>} />
+          <Route path="/combos" element={<ProtectedRoute><Combos /></ProtectedRoute>} />
           <Route path="/coupons" element={<ProtectedRoute><Coupons /></ProtectedRoute>} />
           <Route path="/appointments" element={<ProtectedRoute><Appointments /></ProtectedRoute>} />
           <Route path="/sales" element={<ProtectedRoute><Sales /></ProtectedRoute>} />
           <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
           <Route path="/leads" element={<ProtectedRoute><Leads /></ProtectedRoute>} />
-          <Route path="/memberships" element={<ProtectedRoute><Memberships /></ProtectedRoute>} />
+          <Route path="/packages" element={<ProtectedRoute><Packages /></ProtectedRoute>} />
           <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
           <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
           <Route path="/assistant" element={<ProtectedRoute><AIAssistant /></ProtectedRoute>} />

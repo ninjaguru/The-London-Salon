@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { db, exportToCSV } from '../services/db';
 import { authService } from '../services/auth';
@@ -131,7 +132,8 @@ const Leads: React.FC = () => {
          walletBalance: 0,
          joinDate: new Date().toISOString().split('T')[0],
          notes: `Converted from Lead. Source: ${editingLead.source}. Notes: ${editingLead.notes}`,
-         activeCoupons: []
+         activeCoupons: [],
+         isMember: false
        };
        db.customers.add(newCustomer);
 

@@ -1,6 +1,6 @@
 
 import { 
-  Staff, Product, Customer, Appointment, Sale, Membership, Notification, Category, Service, Lead, CouponTemplate,
+  Staff, Product, Customer, Appointment, Sale, Package, Notification, Category, Service, Lead, CouponTemplate, Combo,
   Role, AppointmentStatus 
 } from '../types';
 import { sheetsService } from './sheets';
@@ -9,8 +9,9 @@ import { sheetsService } from './sheets';
 const INITIAL_STAFF: Staff[] = [];
 const INITIAL_CATEGORIES: Category[] = [];
 const INITIAL_SERVICES: Service[] = [];
+const INITIAL_COMBOS: Combo[] = [];
 const INITIAL_PRODUCTS: Product[] = [];
-const INITIAL_MEMBERSHIPS: Membership[] = [];
+const INITIAL_PACKAGES: Package[] = [];
 const INITIAL_CUSTOMERS: Customer[] = [];
 const INITIAL_LEADS: Lead[] = [];
 const INITIAL_APPOINTMENTS: Appointment[] = [];
@@ -68,10 +69,11 @@ export const db = {
   staff: new StorageService<Staff>('salon_staff_v4_clean', 'Staff', INITIAL_STAFF),
   categories: new StorageService<Category>('salon_categories_v4_clean', 'Categories', INITIAL_CATEGORIES),
   services: new StorageService<Service>('salon_services_v4_clean', 'Services', INITIAL_SERVICES),
+  combos: new StorageService<Combo>('salon_combos_v4_clean', 'Combos', INITIAL_COMBOS),
   inventory: new StorageService<Product>('salon_inventory_v4_clean', 'Inventory', INITIAL_PRODUCTS),
   customers: new StorageService<Customer>('salon_customers_v4_clean', 'Customers', INITIAL_CUSTOMERS),
   leads: new StorageService<Lead>('salon_leads_v4_clean', 'Leads', INITIAL_LEADS),
-  memberships: new StorageService<Membership>('salon_memberships_v4_clean', 'Memberships', INITIAL_MEMBERSHIPS),
+  packages: new StorageService<Package>('salon_packages_v4_clean', 'Packages', INITIAL_PACKAGES),
   appointments: new StorageService<Appointment>('salon_appointments_v4_clean', 'Appointments', INITIAL_APPOINTMENTS),
   sales: new StorageService<Sale>('salon_sales_v4_clean', 'Sales', INITIAL_SALES),
   notifications: new StorageService<Notification>('salon_notifications_v4_clean', 'Notifications', INITIAL_NOTIFICATIONS),
@@ -87,10 +89,11 @@ export const syncFromCloud = async (): Promise<{success: boolean, message: strin
     if (data.Staff) db.staff.overrideLocal(data.Staff);
     if (data.Categories) db.categories.overrideLocal(data.Categories);
     if (data.Services) db.services.overrideLocal(data.Services);
+    if (data.Combos) db.combos.overrideLocal(data.Combos);
     if (data.Inventory) db.inventory.overrideLocal(data.Inventory);
     if (data.Customers) db.customers.overrideLocal(data.Customers);
     if (data.Leads) db.leads.overrideLocal(data.Leads);
-    if (data.Memberships) db.memberships.overrideLocal(data.Memberships);
+    if (data.Packages) db.packages.overrideLocal(data.Packages);
     if (data.Appointments) db.appointments.overrideLocal(data.Appointments);
     if (data.Sales) db.sales.overrideLocal(data.Sales);
     if (data.Notifications) db.notifications.overrideLocal(data.Notifications);

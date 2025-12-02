@@ -22,7 +22,8 @@ import {
   Settings,
   Cloud,
   FileSpreadsheet,
-  TicketPercent
+  TicketPercent,
+  Layers
 } from 'lucide-react';
 import { db, createNotification, syncFromCloud } from '../services/db';
 import { authService } from '../services/auth';
@@ -184,16 +185,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { to: '/leads', icon: Target, label: 'Leads' },
     { to: '/staff', icon: Scissors, label: 'Staff' },
     { to: '/services', icon: Sparkle, label: 'Services' },
+    { to: '/combos', icon: Layers, label: 'Combos' },
     { to: '/inventory', icon: ShoppingBag, label: 'Inventory' },
     { to: '/categories', icon: Tags, label: 'Categories' },
     { to: '/coupons', icon: TicketPercent, label: 'Coupons' },
     { to: '/sales', icon: CreditCard, label: 'Sales' },
-    { to: '/memberships', icon: Crown, label: 'Memberships' },
-    { to: '/reports', icon: BarChart2, label: 'Reports' },
+    { to: '/packages', icon: Crown, label: 'Packages' },
     { to: '/assistant', icon: Sparkles, label: 'Smart Assistant', highlight: true },
   ];
 
   if (user?.role === 'Admin') {
+    navItems.splice(11, 0, { to: '/reports', icon: BarChart2, label: 'Reports' }); // Insert reports before Assistant
     navItems.push({ to: '/settings', icon: Settings, label: 'Settings', highlight: false });
   }
 

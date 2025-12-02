@@ -2,14 +2,14 @@
 import React, { useState, useEffect } from 'react';
 import { db, exportToCSV, getTodayIST } from '../services/db';
 import { authService } from '../services/auth';
-import { Customer, Membership, Sale, CouponTemplate, CustomerCoupon } from '../types';
-import { Plus, Search, Mail, Phone, User, Download, Home, Cake, Heart, Wallet, CreditCard, Gift, Clock, AlertCircle, Crown, History, TicketPercent, CheckCircle } from 'lucide-react';
+import { Customer, Package, Sale, CouponTemplate, CustomerCoupon } from '../types';
+import { Plus, Search, Mail, Phone, User, Download, Home, Cake, Heart, Wallet, CreditCard, Gift, Clock, AlertCircle, Crown, History, TicketPercent, CheckCircle, Star } from 'lucide-react';
 import Modal from './ui/Modal';
 
 const Customers: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'all' | 'upcoming'>('all');
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [memberships, setMemberships] = useState<Membership[]>([]);
+  const [packages, setPackages] = useState<Package[]>([]);
   const [coupons, setCoupons] = useState<CouponTemplate[]>([]);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -40,11 +40,12 @@ const Customers: React.FC = () => {
   const [aMonth, setAMonth] = useState('');
 
   // Wallet Topup
-  const [selectedMembershipId, setSelectedMembershipId] = useState('');
+  const [selectedPackageId, setSelectedPackageId] = useState('');
+  const [buyYearlyMembership, setBuyYearlyMembership] = useState(false);
 
   useEffect(() => {
     setCustomers(db.customers.getAll());
-    setMemberships(db.memberships.getAll());
+    setPackages(db.packages.getAll());
     setCoupons(db.couponTemplates.getAll());
   }, []);
 
@@ -91,7 +92,8 @@ const Customers: React.FC = () => {
 
   const openWalletModal = (customer: Customer) => {
       setEditingCustomer(customer);
-      setSelectedMembershipId('');
+      setSelectedPackageId('');
+      setBuyYearlyMembership(false);
       setIsWalletModalOpen(true);
   };
 
@@ -145,6 +147,7 @@ const Customers: React.FC = () => {
           id: crypto.randomUUID(),
           ...finalData,
           walletBalance: 0,
+          isMember: false,
           joinDate: getTodayIST(),
           activeCoupons: []
         };
@@ -155,41 +158,66 @@ const Customers: React.FC = () => {
     setIsModalOpen(false);
   };
 
-  const handleTopUp = () => {
+  const handleTransaction = () => {
       if (!isAdmin) {
-          alert("Only Admins can add wallet balance.");
+          alert("Only Admins can process these transactions.");
           return;
       }
-      if (!editingCustomer || !selectedMembershipId) return;
-      const membership = memberships.find(m => m.id === selectedMembershipId);
-      if (!membership) return;
+      if (!editingCustomer) return;
 
-      // 1. Calculate New Expiry
-      const now = new Date();
-      // Add validity months to current date
-      now.setMonth(now.getMonth() + (membership.validityMonths || 12));
-      const newRenewalDate = now.toISOString();
+      let updatedCustomer = { ...editingCustomer };
+      let saleItemName = '';
+      let saleAmount = 0;
+      let saleType: any = '';
 
-      // 2. Update Customer Wallet & Renewal
-      const newBalance = editingCustomer.walletBalance + membership.creditValue;
-      const updatedCustomers = customers.map(c => c.id === editingCustomer.id ? { 
-          ...c, 
-          walletBalance: newBalance, 
-          membershipId: membership.id,
-          membershipRenewalDate: newRenewalDate
-      } : c);
-      
+      // 1. Yearly Membership Logic
+      if (buyYearlyMembership) {
+          const now = new Date();
+          now.setFullYear(now.getFullYear() + 1); // Valid 1 year
+          
+          updatedCustomer = {
+              ...updatedCustomer,
+              isMember: true,
+              membershipExpiry: now.toISOString()
+          };
+          saleItemName = 'Club Membership (Yearly)';
+          saleAmount = 200;
+          saleType = 'Membership';
+      } 
+      // 2. Package / Wallet Topup Logic
+      else if (selectedPackageId) {
+          const pkg = packages.find(p => p.id === selectedPackageId);
+          if (!pkg) return;
+
+          const now = new Date();
+          now.setMonth(now.getMonth() + (pkg.validityMonths || 12));
+          
+          updatedCustomer = {
+              ...updatedCustomer,
+              walletBalance: updatedCustomer.walletBalance + pkg.creditValue,
+              packageId: pkg.id,
+              membershipRenewalDate: now.toISOString() // Tracking package expiry
+          };
+          saleItemName = `Package: ${pkg.name}`;
+          saleAmount = pkg.cost;
+          saleType = 'Package';
+      } else {
+          return;
+      }
+
+      // Update DB
+      const updatedCustomers = customers.map(c => c.id === editingCustomer.id ? updatedCustomer : c);
       setCustomers(updatedCustomers);
       db.customers.save(updatedCustomers);
 
-      // 3. Record Sale
+      // Record Sale
       const newSale: Sale = {
           id: crypto.randomUUID(),
           date: new Date().toISOString(),
           customerId: editingCustomer.id,
-          items: [{ name: `Membership: ${membership.name}`, price: membership.cost, quantity: 1, type: 'Membership' }],
-          total: membership.cost,
-          paymentMethod: 'Card' // Assumption for topup
+          items: [{ name: saleItemName, price: saleAmount, quantity: 1, type: saleType }],
+          total: saleAmount,
+          paymentMethod: 'Card' // Default assumption
       };
       db.sales.add(newSale);
 
@@ -356,12 +384,14 @@ const Customers: React.FC = () => {
       {activeTab === 'all' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredCustomers.map(customer => {
-                const membership = memberships.find(m => m.id === customer.membershipId);
-                // Check expiry
-                const expiryDate = customer.membershipRenewalDate ? new Date(customer.membershipRenewalDate) : null;
-                const daysToExpiry = expiryDate ? Math.ceil((expiryDate.getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : null;
-                const isExpiringSoon = daysToExpiry !== null && daysToExpiry <= 30 && daysToExpiry > 0;
-                const isExpired = daysToExpiry !== null && daysToExpiry <= 0;
+                const pkg = packages.find(p => p.id === customer.packageId);
+                // Check package expiry
+                const pkgExpiryDate = customer.membershipRenewalDate ? new Date(customer.membershipRenewalDate) : null;
+                const pkgIsExpired = pkgExpiryDate ? new Date() > pkgExpiryDate : false;
+                
+                // Check Club Membership
+                const clubExpiry = customer.membershipExpiry ? new Date(customer.membershipExpiry) : null;
+                const isClubMember = customer.isMember && clubExpiry && clubExpiry > new Date();
                 
                 // Active Coupons Count
                 const activeCoupons = customer.activeCoupons?.filter(c => !c.isRedeemed && new Date(c.expiryDate) > new Date()) || [];
@@ -374,7 +404,10 @@ const Customers: React.FC = () => {
                                 <User size={24} />
                             </div>
                             <div className="ml-4">
-                                <h3 className="text-lg font-bold text-gray-900">{customer.name}</h3>
+                                <div className="flex items-center gap-2">
+                                    <h3 className="text-lg font-bold text-gray-900">{customer.name}</h3>
+                                    {isClubMember && <Star size={16} className="text-yellow-500 fill-yellow-500" title="Club Member" />}
+                                </div>
                                 <button 
                                     onClick={(e) => { e.stopPropagation(); openModal(customer); }} 
                                     className="text-xs text-indigo-600 hover:text-indigo-800 underline"
@@ -394,24 +427,30 @@ const Customers: React.FC = () => {
                             <button 
                                 onClick={(e) => { e.stopPropagation(); openWalletModal(customer); }}
                                 className="bg-white border border-gray-300 p-2 rounded-full hover:bg-gray-50 text-green-600 z-10"
-                                title="Top Up Wallet"
+                                title="Add Funds / Buy Membership"
                             >
                                 <Wallet size={18} />
                             </button>
                         )}
-                        {membership && (
+                        {pkg && (
                             <div className="absolute right-14 top-2 opacity-10">
                                 <Crown size={40} />
                             </div>
                         )}
                     </div>
+
+                    {isClubMember && (
+                         <div className="mb-2 text-xs bg-yellow-50 text-yellow-800 rounded px-2 py-1 flex items-center border border-yellow-200">
+                             <Star size={12} className="mr-1"/> Club Member (Exp: {new Date(customer.membershipExpiry!).toLocaleDateString()})
+                         </div>
+                    )}
                     
-                    {membership && expiryDate && (
-                        <div className={`mb-4 text-xs rounded-md p-2 flex items-center ${isExpired ? 'bg-red-50 text-red-700' : isExpiringSoon ? 'bg-amber-50 text-amber-700' : 'bg-blue-50 text-blue-700'}`}>
-                            {isExpired ? <AlertCircle size={14} className="mr-2"/> : <Clock size={14} className="mr-2"/>}
+                    {pkg && pkgExpiryDate && (
+                        <div className={`mb-4 text-xs rounded-md p-2 flex items-center ${pkgIsExpired ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'}`}>
+                            {pkgIsExpired ? <AlertCircle size={14} className="mr-2"/> : <Clock size={14} className="mr-2"/>}
                             <span>
-                                {isExpired ? 'Expired on ' : 'Expires: '}
-                                {expiryDate.toLocaleDateString()}
+                                {pkgIsExpired ? 'Package Expired on ' : 'Package Expires: '}
+                                {pkgExpiryDate.toLocaleDateString()}
                             </span>
                         </div>
                     )}
@@ -433,9 +472,6 @@ const Customers: React.FC = () => {
                     )}
                     
                     <div className="space-y-2 mt-auto">
-                        <div className="flex items-center text-gray-600 text-sm">
-                            <Mail size={16} className="mr-2 text-gray-400" /> {customer.email || <span className="text-gray-400 italic">No email</span>}
-                        </div>
                         <div className="flex items-center text-gray-600 text-sm">
                             <Phone size={16} className="mr-2 text-gray-400" /> {customer.phone}
                         </div>
@@ -578,32 +614,50 @@ const Customers: React.FC = () => {
         </form>
       </Modal>
 
-      {/* Wallet Topup Modal */}
-      <Modal isOpen={isWalletModalOpen} onClose={() => setIsWalletModalOpen(false)} title="Add Funds / Buy Membership">
+      {/* Wallet / Membership Modal */}
+      <Modal isOpen={isWalletModalOpen} onClose={() => setIsWalletModalOpen(false)} title="Buy Package / Membership">
         <div className="space-y-4">
             <p className="text-sm text-gray-500">
-                Adding funds for <span className="font-bold text-gray-800">{editingCustomer?.name}</span>. 
-                Current Balance: ₹{editingCustomer?.walletBalance}
+                Processing for <span className="font-bold text-gray-800">{editingCustomer?.name}</span>. 
             </p>
             
-            <div className="space-y-3">
-                {memberships.map(m => (
+            <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
+                {/* Yearly Membership Option */}
+                <div 
+                    onClick={() => { setBuyYearlyMembership(true); setSelectedPackageId(''); }}
+                    className={`border rounded-lg p-3 cursor-pointer flex flex-col gap-2 ${buyYearlyMembership ? 'border-yellow-500 bg-yellow-50' : 'border-gray-200 hover:bg-gray-50'}`}
+                >
+                     <div className="flex justify-between items-center w-full">
+                        <div className="flex items-center">
+                            <Star size={18} className="text-yellow-500 mr-2" />
+                            <div>
+                                <p className="font-bold text-gray-900">Club Membership (Yearly)</p>
+                                <p className="text-xs text-yellow-700">10% Off Services • Valid 1 Year</p>
+                            </div>
+                        </div>
+                        <p className="font-bold text-gray-700">₹200</p>
+                    </div>
+                </div>
+
+                <div className="border-t border-gray-100 my-2 pt-2 text-xs font-bold text-gray-500 uppercase">Wallet Packages</div>
+
+                {packages.map(p => (
                     <div 
-                        key={m.id} 
-                        onClick={() => setSelectedMembershipId(m.id)}
-                        className={`border rounded-lg p-3 cursor-pointer flex flex-col gap-2 ${selectedMembershipId === m.id ? 'border-rose-500 bg-rose-50' : 'border-gray-200 hover:bg-gray-50'}`}
+                        key={p.id} 
+                        onClick={() => { setSelectedPackageId(p.id); setBuyYearlyMembership(false); }}
+                        className={`border rounded-lg p-3 cursor-pointer flex flex-col gap-2 ${selectedPackageId === p.id ? 'border-rose-500 bg-rose-50' : 'border-gray-200 hover:bg-gray-50'}`}
                     >
                         <div className="flex justify-between items-center w-full">
                             <div>
-                                <p className="font-bold text-gray-900">{m.name}</p>
-                                <p className="text-xs text-green-600">Get ₹{m.creditValue} • Valid {m.validityMonths} months</p>
+                                <p className="font-bold text-gray-900">{p.name}</p>
+                                <p className="text-xs text-green-600">Get ₹{p.creditValue} • Valid {p.validityMonths} months</p>
                             </div>
-                            <p className="font-bold text-gray-700">Pay ₹{m.cost}</p>
+                            <p className="font-bold text-gray-700">Pay ₹{p.cost}</p>
                         </div>
-                        {m.complimentaryServices && m.complimentaryServices.length > 0 && (
+                        {p.complimentaryServices && p.complimentaryServices.length > 0 && (
                             <div className="text-xs text-gray-500 border-t border-gray-200/50 pt-2">
                                 <span className="font-semibold text-rose-500">Free: </span>
-                                {m.complimentaryServices.join(', ')}
+                                {p.complimentaryServices.join(', ')}
                             </div>
                         )}
                     </div>
@@ -612,11 +666,11 @@ const Customers: React.FC = () => {
 
             <div className="mt-5 sm:mt-6">
                 <button 
-                    onClick={handleTopUp}
-                    disabled={!selectedMembershipId}
+                    onClick={handleTransaction}
+                    disabled={!selectedPackageId && !buyYearlyMembership}
                     className="w-full inline-flex justify-center items-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <CreditCard className="mr-2 w-4 h-4" /> Process Payment & Add Credit
+                  <CreditCard className="mr-2 w-4 h-4" /> Process Payment
                 </button>
             </div>
         </div>

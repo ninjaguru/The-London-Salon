@@ -42,6 +42,14 @@ export interface Service {
   description?: string;
 }
 
+export interface Combo {
+  id: string;
+  name: string;
+  price: number;
+  description: string; // Comma separated services or details
+  active: boolean;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -81,8 +89,16 @@ export interface Customer {
   apartment: string;
   birthday: string;
   anniversary: string;
-  membershipId?: string; // Link to the specific membership plan they bought
-  membershipRenewalDate?: string; // ISO Date string
+  
+  // Wallet Packages
+  packageId?: string; // Link to the specific wallet plan/package
+  
+  // Yearly Membership
+  isMember: boolean; // Paid 200rs yearly membership
+  membershipExpiry?: string; // ISO Date string for yearly membership
+
+  membershipRenewalDate?: string; // ISO Date string for Wallet Package Expiry (Legacy name kept for compatibility or refactored)
+  
   walletBalance: number; // Current credit balance
   joinDate: string;
   notes?: string;
@@ -105,6 +121,8 @@ export interface Appointment {
   durationMin: number;
   status: AppointmentStatus;
   price: number;
+  discount: number; // Discount amount applied
+  paymentMethod?: 'Cash' | 'Card' | 'UPI' | 'Wallet'; // Method of payment used
 }
 
 export interface Sale {
@@ -115,13 +133,13 @@ export interface Sale {
     name: string;
     price: number;
     quantity: number;
-    type: 'Service' | 'Product' | 'Membership';
+    type: 'Service' | 'Product' | 'Package' | 'Combo' | 'Membership';
   }>;
   total: number;
   paymentMethod: 'Cash' | 'Card' | 'Wallet';
 }
 
-export interface Membership {
+export interface Package {
   id: string;
   name: string;
   cost: number; // How much the customer pays (e.g. 5000)

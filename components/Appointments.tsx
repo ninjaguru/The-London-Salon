@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { db, createNotification, exportToCSV, getTodayIST } from '../services/db';
-import { Appointment, Staff, Customer, AppointmentStatus, Service, Category } from '../types';
-import { Plus, Clock, Scissors, Download, X, FileText, Search, User, Phone, Check, Tag, ChevronDown, Calendar as CalendarIcon, DollarSign, LayoutList, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Appointment, Staff, Customer, AppointmentStatus, Service, Category, Combo } from '../types';
+import { Plus, Clock, Scissors, Download, X, FileText, Search, User, Phone, Check, Tag, ChevronDown, Calendar as CalendarIcon, DollarSign, LayoutList, ChevronLeft, ChevronRight, Layers, Save } from 'lucide-react';
 import Modal from './ui/Modal';
 import { jsPDF } from 'jspdf';
 
@@ -11,6 +11,7 @@ const Appointments: React.FC = () => {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [services, setServices] = useState<Service[]>([]);
+  const [combos, setCombos] = useState<Combo[]>([]);
   const [categories, setCategories] = useState<Category[]>([]); 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
@@ -45,14 +46,21 @@ const Appointments: React.FC = () => {
     date: getTodayIST(), 
     time: '10:00', 
     durationMin: 60, 
-    price: 0
+    price: 0,
+    discountPercent: 0 // Changed from discount amount to percent
   });
+
+  // Payment Modal State
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [pendingBillData, setPendingBillData] = useState<{customer: Customer, appointments: Appointment[]} | null>(null);
+  const [paymentMode, setPaymentMode] = useState<'Cash' | 'Card' | 'UPI'>('Cash');
 
   useEffect(() => {
     setAppointments(db.appointments.getAll());
     setStaff(db.staff.getAll());
     setCustomers(db.customers.getAll());
     setServices(db.services.getAll());
+    setCombos(db.combos.getAll());
     setCategories(db.categories.getAll());
   }, []);
 
@@ -71,7 +79,8 @@ const Appointments: React.FC = () => {
         date: prefillDate || getTodayIST(), 
         time: '10:00', 
         durationMin: 60, 
-        price: 0
+        price: 0,
+        discountPercent: 0
       });
       setCustomerSearch('');
       setServiceSearch('');
@@ -87,11 +96,17 @@ const Appointments: React.FC = () => {
         return;
     }
 
+    // Calculate Final Price based on Percentage
+    const listPrice = Number(formData.price);
+    const discountAmount = Math.round(listPrice * (Number(formData.discountPercent) / 100));
+    const finalPrice = Math.max(0, listPrice - discountAmount);
+
     const newAppt: Appointment = {
       id: crypto.randomUUID(),
       ...formData,
       durationMin: Number(formData.durationMin),
-      price: Number(formData.price),
+      price: finalPrice, // Save final price after discount
+      discount: discountAmount, // Save the calculated amount for record keeping
       status: AppointmentStatus.Scheduled
     };
     const updated = [...appointments, newAppt];
@@ -132,15 +147,35 @@ const Appointments: React.FC = () => {
       setShowCustomerList(false);
   };
 
-  const selectService = (service: Service) => {
+  const selectItem = (item: Service | Combo, type: 'Service' | 'Combo') => {
+      // Logic for Discount: 
+      // If Service AND Customer is Club Member -> 10% Discount
+      // If Combo -> No Discount logic applied automatically
+      let price = type === 'Service' ? ((item as Service).offerPrice || item.price) : item.price;
+      let discountPercent = 0;
+
+      // Check Membership Status
+      if (formData.customerId) {
+          const customer = customers.find(c => c.id === formData.customerId);
+          if (customer && customer.isMember) {
+              // Check membership expiry
+              const expiry = customer.membershipExpiry ? new Date(customer.membershipExpiry) : null;
+              if (expiry && expiry > new Date() && type === 'Service') {
+                  // Apply 10% Discount
+                  discountPercent = 10; 
+              }
+          }
+      }
+
       setFormData({
           ...formData,
-          serviceId: service.id,
-          serviceName: service.name,
-          price: service.offerPrice || service.price,
-          durationMin: service.durationMin
+          serviceId: item.id,
+          serviceName: item.name,
+          price: price, // Set List Price
+          discountPercent: discountPercent,
+          durationMin: type === 'Service' ? (item as Service).durationMin : 60 // Default 60 for combo for now
       });
-      setServiceSearch(service.name);
+      setServiceSearch(item.name);
       setShowServiceList(false);
   };
 
@@ -150,6 +185,7 @@ const Appointments: React.FC = () => {
           serviceId: '',
           serviceName: '',
           price: 0,
+          discountPercent: 0,
           durationMin: 60
       });
       setServiceSearch('');
@@ -163,8 +199,13 @@ const Appointments: React.FC = () => {
       c.phone.includes(customerSearch)
   );
 
+  // Combine Services and Combos for Search
   const filteredServices = services.filter(s => 
       s.name.toLowerCase().includes(serviceSearch.toLowerCase())
+  );
+  
+  const filteredCombos = combos.filter(c => 
+      c.active && c.name.toLowerCase().includes(serviceSearch.toLowerCase())
   );
 
   const clearFilters = () => {
@@ -174,7 +215,41 @@ const Appointments: React.FC = () => {
       setFilterStatus('');
   };
 
-  const generateBill = async (customer: Customer, appointmentsToBill: Appointment[]) => {
+  const initiateBillGeneration = (customer: Customer, appointmentsToBill: Appointment[]) => {
+      setPendingBillData({ customer, appointments: appointmentsToBill });
+      setPaymentMode('Cash');
+      setIsPaymentModalOpen(true);
+  };
+
+  const confirmBillGeneration = async (generatePdf: boolean) => {
+      if (!pendingBillData) return;
+
+      // 1. Update Appointments with Payment Mode and Status
+      const appointmentIdsToUpdate = new Set(pendingBillData.appointments.map(a => a.id));
+      const updatedAppointments = appointments.map(appt => {
+          if (appointmentIdsToUpdate.has(appt.id)) {
+              return {
+                  ...appt,
+                  paymentMethod: paymentMode as any,
+                  status: AppointmentStatus.Completed // Ensure status is completed when billed
+              };
+          }
+          return appt;
+      });
+
+      setAppointments(updatedAppointments);
+      db.appointments.save(updatedAppointments);
+
+      // 2. Generate PDF if requested
+      if (generatePdf) {
+          await generateBill(pendingBillData.customer, pendingBillData.appointments, paymentMode);
+      }
+
+      setIsPaymentModalOpen(false);
+      setPendingBillData(null);
+  };
+
+  const generateBill = async (customer: Customer, appointmentsToBill: Appointment[], mode: string) => {
     // Filter non-cancelled
     const items = appointmentsToBill.filter(a => a.status !== AppointmentStatus.Cancelled);
 
@@ -239,9 +314,14 @@ const Appointments: React.FC = () => {
     
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
-    doc.text(customer.name, 20, yOffset + 6);
-    doc.text(customer.phone, 20, yOffset + 11);
-    if(customer.apartment) doc.text(customer.apartment, 20, yOffset + 16);
+    doc.text(String(customer.name), 20, yOffset + 6);
+    doc.text(String(customer.phone), 20, yOffset + 11);
+    if(customer.apartment) doc.text(String(customer.apartment), 20, yOffset + 16);
+    if(customer.isMember) {
+        doc.setTextColor(218, 165, 32);
+        doc.text('Club Member', 20, yOffset + 21);
+        doc.setTextColor(0);
+    }
 
     yOffset += 30;
 
@@ -252,6 +332,7 @@ const Appointments: React.FC = () => {
     doc.text('Date', 25, yOffset + 7);
     doc.text('Service', 55, yOffset + 7);
     doc.text('Stylist', 120, yOffset + 7);
+    doc.text('Discount', 155, yOffset + 7);
     doc.text('Amount', pageWidth - 25, yOffset + 7, { align: 'right' });
 
     // Items Loop
@@ -272,14 +353,21 @@ const Appointments: React.FC = () => {
             : item.serviceName;
 
         doc.text(new Date(item.date).toLocaleDateString(), 25, yOffset);
-        doc.text(serviceName, 55, yOffset);
-        doc.text(itemStylist, 120, yOffset);
+        doc.text(String(serviceName), 55, yOffset);
+        doc.text(String(itemStylist), 120, yOffset);
+        
+        if (item.discount > 0) {
+            doc.text(`-Rs.${item.discount}`, 155, yOffset);
+        } else {
+             doc.text('-', 155, yOffset);
+        }
+
         doc.text(`Rs. ${item.price.toFixed(2)}`, pageWidth - 25, yOffset, { align: 'right' });
         
         totalAmount += item.price;
         yOffset += 10;
         
-        if (yOffset > 270) {
+        if (yOffset > 250) {
             doc.addPage();
             yOffset = 20;
         }
@@ -294,6 +382,11 @@ const Appointments: React.FC = () => {
     doc.setFontSize(12);
     doc.text('Total:', 140, yOffset);
     doc.text(`Rs. ${totalAmount.toFixed(2)}`, pageWidth - 25, yOffset, { align: 'right' });
+
+    yOffset += 15;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Payment Mode: ${mode}`, 20, yOffset);
 
     // Footer
     doc.setFont("helvetica", "italic");
@@ -368,6 +461,9 @@ const Appointments: React.FC = () => {
       }
       groupedAppointments[appt.customerId].appointments.push(appt);
   });
+
+  // Helper to calculate estimated deduction for display in form
+  const estimatedDeduction = Math.round(Number(formData.price) * (Number(formData.discountPercent) / 100));
 
   return (
     <div className="flex flex-col h-full">
@@ -475,6 +571,9 @@ const Appointments: React.FC = () => {
                         dates[a.date].push(a);
                     });
 
+                    // Check if there are any completed appointments to enable billing
+                    const hasCompleted = customerAppts.some(a => a.status === AppointmentStatus.Completed);
+
                     return (
                         <div key={customer?.id || 'unknown'} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
                             {/* Customer Header */}
@@ -496,13 +595,15 @@ const Appointments: React.FC = () => {
                                     <div className="text-sm text-gray-500 bg-white px-3 py-1 rounded border border-gray-200">
                                         {customerAppts.length} Service{customerAppts.length !== 1 ? 's' : ''}
                                     </div>
-                                    <button 
-                                        onClick={() => customer && generateBill(customer, customerAppts)}
-                                        className="text-xs flex items-center px-3 py-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 text-gray-700 transition-colors"
-                                        title="Generate PDF Bill for all filtered services for this customer"
-                                    >
-                                        <FileText size={14} className="mr-1.5 text-indigo-500" /> Create Bill
-                                    </button>
+                                    {hasCompleted && (
+                                        <button 
+                                            onClick={() => customer && initiateBillGeneration(customer, customerAppts.filter(a => a.status === AppointmentStatus.Completed))}
+                                            className="text-xs flex items-center px-3 py-1.5 bg-green-50 border border-green-200 rounded hover:bg-green-100 text-green-700 transition-colors font-medium shadow-sm"
+                                            title="Generate Bill for COMPLETED filtered services"
+                                        >
+                                            <DollarSign size={14} className="mr-1.5" /> Create Bill
+                                        </button>
+                                    )}
                                 </div>
                             </div>
 
@@ -535,8 +636,16 @@ const Appointments: React.FC = () => {
                                                         </div>
                                                         
                                                         <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
-                                                            <div className="font-semibold text-gray-900 mr-4">
-                                                                ₹{appt.price}
+                                                            <div className="flex flex-col items-end mr-4">
+                                                                {appt.discount > 0 && (
+                                                                    <span className="text-xs text-green-600 font-semibold line-through">₹{appt.price + appt.discount}</span>
+                                                                )}
+                                                                <div className="font-semibold text-gray-900">
+                                                                    ₹{appt.price}
+                                                                </div>
+                                                                {appt.paymentMethod && (
+                                                                    <span className="text-[10px] text-gray-500">Paid via {appt.paymentMethod}</span>
+                                                                )}
                                                             </div>
                                                             <div className="min-w-[140px]">
                                                                 <select 
@@ -645,6 +754,7 @@ const Appointments: React.FC = () => {
           </div>
       )}
 
+      {/* Booking Modal */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="New Appointment">
         <form onSubmit={handleSubmit} className="space-y-4 h-[70vh] overflow-y-auto px-1 relative">
             {/* Customer Type Ahead */}
@@ -696,6 +806,11 @@ const Appointments: React.FC = () => {
                                         <span className="block text-xs text-gray-500 truncate flex items-center">
                                             <Phone size={10} className="mr-1" /> {c.phone}
                                         </span>
+                                        {c.isMember && (
+                                            <span className="block text-[10px] text-yellow-600 font-bold flex items-center">
+                                                <DollarSign size={8} className="mr-0.5" /> Club Member
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
                             ))
@@ -717,9 +832,9 @@ const Appointments: React.FC = () => {
                 </select>
             </div>
 
-            {/* Service Type Ahead */}
+            {/* Service / Combo Type Ahead */}
             <div className="relative">
-                <label className="block text-sm font-medium text-gray-700">Select Service</label>
+                <label className="block text-sm font-medium text-gray-700">Select Service or Combo</label>
                 <div className="relative mt-1">
                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <Search className="h-4 w-4 text-gray-400" />
@@ -730,10 +845,10 @@ const Appointments: React.FC = () => {
                         onChange={(e) => {
                             setServiceSearch(e.target.value);
                             setShowServiceList(true);
-                            if (formData.serviceId) setFormData({...formData, serviceId: '', price: 0, durationMin: 60, serviceName: ''});
+                            if (formData.serviceId) setFormData({...formData, serviceId: '', price: 0, discountPercent: 0, durationMin: 60, serviceName: ''});
                         }}
                         onFocus={() => setShowServiceList(true)}
-                        placeholder="Search service..."
+                        placeholder="Search service or combo..."
                         className={`block w-full pl-10 pr-10 py-2 border rounded-md shadow-sm focus:ring-rose-500 focus:border-rose-500 sm:text-sm ${formData.serviceId ? 'border-green-300 bg-green-50' : 'border-gray-300'}`}
                     />
                      {formData.serviceId ? (
@@ -751,12 +866,15 @@ const Appointments: React.FC = () => {
 
                 {showServiceList && (
                     <div className="absolute z-50 mt-1 w-full bg-white shadow-2xl max-h-80 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm border border-gray-100">
-                        {filteredServices.length > 0 ? (
-                            filteredServices.map(s => (
+                        {/* Services List */}
+                        {filteredServices.length > 0 && (
+                            <>
+                            <div className="px-3 py-1 bg-gray-50 text-xs font-bold text-gray-500 border-b border-gray-100">Services</div>
+                            {filteredServices.map(s => (
                                 <div 
                                     key={s.id}
-                                    onClick={() => selectService(s)}
-                                    className="cursor-pointer select-none relative p-3 hover:bg-rose-50 border-b border-gray-100 last:border-0 transition-colors"
+                                    onClick={() => selectItem(s, 'Service')}
+                                    className="cursor-pointer select-none relative p-3 hover:bg-rose-50 border-b border-gray-100 transition-colors"
                                 >
                                     <div className="flex justify-between items-start">
                                         <div>
@@ -767,13 +885,6 @@ const Appointments: React.FC = () => {
                                                 </span>
                                                 <span className="inline-flex items-center text-[10px] text-gray-500 bg-white px-1.5 py-0.5 rounded border border-gray-200">
                                                     <Clock size={10} className="mr-1"/> {s.durationMin}m
-                                                </span>
-                                                <span className={`inline-flex items-center text-[10px] px-1.5 py-0.5 rounded border ${
-                                                    s.gender === 'Women' ? 'border-pink-200 bg-pink-50 text-pink-700' :
-                                                    s.gender === 'Men' ? 'border-blue-200 bg-blue-50 text-blue-700' :
-                                                    'border-purple-200 bg-purple-50 text-purple-700'
-                                                }`}>
-                                                    {s.gender}
                                                 </span>
                                             </div>
                                         </div>
@@ -788,14 +899,41 @@ const Appointments: React.FC = () => {
                                             )}
                                         </div>
                                     </div>
-                                    {s.description && (
-                                        <p className="text-xs text-gray-500 mt-2 line-clamp-1 italic">{s.description}</p>
-                                    )}
                                 </div>
-                            ))
-                        ) : (
+                            ))}
+                            </>
+                        )}
+
+                        {/* Combos List */}
+                        {filteredCombos.length > 0 && (
+                            <>
+                            <div className="px-3 py-1 bg-gray-50 text-xs font-bold text-gray-500 border-b border-gray-100">Combos</div>
+                            {filteredCombos.map(c => (
+                                <div 
+                                    key={c.id}
+                                    onClick={() => selectItem(c, 'Combo')}
+                                    className="cursor-pointer select-none relative p-3 hover:bg-rose-50 border-b border-gray-100 transition-colors"
+                                >
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <div className="font-bold text-gray-900">{c.name}</div>
+                                                <span className="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 rounded-full flex items-center"><Layers size={8} className="mr-1"/> Combo</span>
+                                            </div>
+                                            <div className="text-xs text-gray-500 mt-1 line-clamp-1">{c.description}</div>
+                                        </div>
+                                        <div className="text-right ml-2 flex-shrink-0">
+                                            <span className="text-gray-900 font-bold bg-gray-50 px-1 rounded">₹{c.price}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                            </>
+                        )}
+                        
+                        {filteredServices.length === 0 && filteredCombos.length === 0 && (
                             <div className="cursor-default select-none relative py-3 px-4 text-gray-500 italic text-center">
-                                No services found matching "{serviceSearch}"
+                                No services or combos found.
                             </div>
                         )}
                     </div>
@@ -825,15 +963,37 @@ const Appointments: React.FC = () => {
                     <input name="time" type="time" required value={formData.time} onChange={handleChange} className="mt-1 block w-full border p-2 rounded-md border-gray-300" />
                 </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
                 <div>
                     <label className="block text-sm font-medium text-gray-700">Duration (min)</label>
                     <input name="durationMin" type="number" required value={formData.durationMin} onChange={handleChange} className="mt-1 block w-full border p-2 rounded-md border-gray-300" />
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-gray-700">Price (₹)</label>
+                    <label className="block text-sm font-medium text-gray-700">Price (List Price)</label>
                     <input name="price" type="number" required value={formData.price} onChange={handleChange} className="mt-1 block w-full border p-2 rounded-md border-gray-300" />
                 </div>
+                 <div>
+                    <label className="block text-sm font-medium text-gray-700">Discount (%)</label>
+                    <input 
+                        name="discountPercent" 
+                        type="number" 
+                        min="0"
+                        max="100"
+                        value={formData.discountPercent} 
+                        onChange={handleChange} 
+                        className="mt-1 block w-full border p-2 rounded-md border-gray-300 bg-yellow-50 focus:bg-white" 
+                    />
+                </div>
+            </div>
+            <div className="text-xs font-bold text-right space-y-1">
+                 {Number(formData.discountPercent) > 0 && (
+                     <div className="text-red-500">
+                         Discount: -₹{estimatedDeduction} ({formData.discountPercent}%)
+                     </div>
+                 )}
+                 <div className="text-green-600 text-sm">
+                    Final Price: ₹{Math.max(0, Number(formData.price) - estimatedDeduction)}
+                 </div>
             </div>
             <div className="mt-5 sm:mt-6 pb-2">
                 <button type="submit" className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-rose-600 text-base font-medium text-white hover:bg-rose-700 focus:outline-none ring-2 ring-offset-2 ring-rose-500">
@@ -841,6 +1001,62 @@ const Appointments: React.FC = () => {
                 </button>
             </div>
         </form>
+      </Modal>
+
+      {/* Payment Modal */}
+      <Modal isOpen={isPaymentModalOpen} onClose={() => setIsPaymentModalOpen(false)} title="Generate Bill & Payment">
+        <div className="space-y-6">
+            <div className="bg-gray-50 p-4 rounded-md border border-gray-200">
+                <h4 className="font-bold text-gray-800 text-sm mb-2">Summary</h4>
+                <div className="flex justify-between text-sm mb-1">
+                    <span className="text-gray-600">Customer:</span>
+                    <span className="font-medium">{pendingBillData?.customer.name}</span>
+                </div>
+                <div className="flex justify-between text-sm mb-1">
+                    <span className="text-gray-600">Services Count:</span>
+                    <span className="font-medium">{pendingBillData?.appointments.length}</span>
+                </div>
+                <div className="border-t border-gray-200 mt-2 pt-2 flex justify-between font-bold text-lg text-gray-900">
+                    <span>Total Payable:</span>
+                    <span>₹{pendingBillData?.appointments.reduce((acc, a) => acc + a.price, 0).toFixed(2)}</span>
+                </div>
+            </div>
+
+            <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Select Payment Mode</label>
+                <div className="grid grid-cols-3 gap-3">
+                    {['Cash', 'Card', 'UPI'].map(mode => (
+                        <button
+                            key={mode}
+                            type="button"
+                            onClick={() => setPaymentMode(mode as any)}
+                            className={`py-3 rounded-lg border text-sm font-medium transition-colors ${
+                                paymentMode === mode 
+                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' 
+                                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                            }`}
+                        >
+                            {mode}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            <div className="pt-2 grid grid-cols-2 gap-3">
+                <button 
+                    onClick={() => confirmBillGeneration(false)}
+                    className="flex justify-center items-center py-3 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                    <Save className="w-5 h-5 mr-2" /> Save Payment
+                </button>
+                <button 
+                    onClick={() => confirmBillGeneration(true)}
+                    className="flex justify-center items-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                >
+                    <Download className="w-5 h-5 mr-2" /> PDF Invoice
+                </button>
+            </div>
+        </div>
       </Modal>
     </div>
   );
