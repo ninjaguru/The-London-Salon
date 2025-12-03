@@ -1,9 +1,9 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { db, exportToCSV, getTodayIST } from '../services/db';
 import { authService } from '../services/auth';
 import { Customer, Package, Sale, CouponTemplate, CustomerCoupon } from '../types';
-import { Plus, Search, Mail, Phone, User, Download, Home, Cake, Heart, Wallet, CreditCard, Gift, Clock, AlertCircle, Crown, History, TicketPercent, CheckCircle, Star } from 'lucide-react';
+import { Plus, Search, Mail, Phone, User, Download, Home, Cake, Heart, Wallet, CreditCard, Gift, Clock, AlertCircle, Crown, History, TicketPercent, CheckCircle, Star, Upload } from 'lucide-react';
 import Modal from './ui/Modal';
 
 const Customers: React.FC = () => {
@@ -25,6 +25,9 @@ const Customers: React.FC = () => {
   // Coupon Assignment State
   const [selectedCouponTemplateId, setSelectedCouponTemplateId] = useState('');
 
+  // Import Ref
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const user = authService.getCurrentUser();
   const isAdmin = user?.role === 'Admin';
 
@@ -42,6 +45,10 @@ const Customers: React.FC = () => {
   // Wallet Topup
   const [selectedPackageId, setSelectedPackageId] = useState('');
   const [buyYearlyMembership, setBuyYearlyMembership] = useState(false);
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 20;
 
   useEffect(() => {
     setCustomers(db.customers.getAll());
@@ -254,11 +261,104 @@ const Customers: React.FC = () => {
       setIsCouponModalOpen(false);
   };
 
+  // --- IMPORT LOGIC ---
+  const handleImportClick = () => {
+      fileInputRef.current?.click();
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+          const text = event.target?.result as string;
+          if (!text) return;
+
+          const lines = text.split(/\r\n|\n/);
+          if (lines.length < 2) {
+              alert('File appears to be empty or missing headers.');
+              return;
+          }
+
+          // Headers check
+          const headers = lines[0].toLowerCase().split(',');
+          const nameIndex = headers.findIndex(h => h.includes('name'));
+          const phoneIndex = headers.findIndex(h => h.includes('phone') || h.includes('mobile'));
+
+          if (nameIndex === -1 || phoneIndex === -1) {
+              alert('CSV must contain "Name" and "Phone" (or Mobile) headers.');
+              return;
+          }
+
+          const newCustomers: Customer[] = [];
+          const existingPhones = new Set(customers.map(c => c.phone));
+          const existingNames = new Set(customers.map(c => c.name.toLowerCase()));
+
+          let addedCount = 0;
+          let skippedCount = 0;
+
+          for (let i = 1; i < lines.length; i++) {
+              const line = lines[i].trim();
+              if (!line) continue;
+              
+              // Handle CSV Split (Basic split, ignoring advanced quote handling for simplicity based on expected input)
+              const cols = line.split(','); 
+              const rawName = cols[nameIndex]?.trim().replace(/^"|"$/g, '');
+              const rawPhone = cols[phoneIndex]?.trim().replace(/^"|"$/g, '');
+
+              if (rawName && rawPhone) {
+                  // Basic deduplication
+                  if (!existingPhones.has(rawPhone)) {
+                      newCustomers.push({
+                          id: crypto.randomUUID(),
+                          name: rawName,
+                          phone: rawPhone,
+                          email: '',
+                          apartment: '',
+                          birthday: '',
+                          anniversary: '',
+                          walletBalance: 0,
+                          joinDate: getTodayIST(),
+                          isMember: false,
+                          activeCoupons: []
+                      });
+                      existingPhones.add(rawPhone);
+                      addedCount++;
+                  } else {
+                      skippedCount++;
+                  }
+              }
+          }
+
+          if (newCustomers.length > 0) {
+              const updated = [...customers, ...newCustomers];
+              setCustomers(updated);
+              db.customers.save(updated);
+              alert(`Import Successful!\nAdded: ${addedCount}\nSkipped (Duplicates): ${skippedCount}`);
+          } else {
+              alert('No new customers found. All phone numbers might be duplicates.');
+          }
+          
+          // Reset
+          if (fileInputRef.current) fileInputRef.current.value = '';
+      };
+      reader.readAsText(file);
+  };
+
+  // --- Filtering & Pagination ---
   const filteredCustomers = customers.filter(c => 
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     c.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.phone.includes(searchTerm)
   );
+
+  // Pagination Logic (Client Side for now since we loaded all)
+  const totalPages = Math.ceil(filteredCustomers.length / pageSize);
+  const paginatedCustomers = filteredCustomers.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  const goToNextPage = () => setCurrentPage(p => Math.min(totalPages, p + 1));
+  const goToPrevPage = () => setCurrentPage(p => Math.max(1, p - 1));
 
   // Logic for Upcoming Birthdays & Anniversaries (Next 30 Days for the tab view)
   const getUpcomingEvents = (daysToCheck: number) => {
@@ -338,11 +438,30 @@ const Customers: React.FC = () => {
                     onChange={e => setSearchTerm(e.target.value)}
                 />
             </div>
+            
+            {/* Hidden Input for Import */}
+            <input 
+                type="file" 
+                accept=".csv" 
+                ref={fileInputRef} 
+                onChange={handleFileUpload} 
+                className="hidden" 
+            />
+
+            <button 
+                onClick={handleImportClick}
+                className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm"
+                title="Import Customers from CSV"
+            >
+                <Upload className="w-4 h-4 mr-2" /> Import
+            </button>
+
             <button 
                 onClick={() => exportToCSV(customers, 'customers')}
                 className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm"
+                title="Export Customers to CSV"
             >
-                <Download className="w-4 h-4" />
+                <Download className="w-4 h-4 mr-2" /> Export
             </button>
             <button 
                 onClick={() => openModal()}
@@ -382,136 +501,165 @@ const Customers: React.FC = () => {
       </div>
 
       {activeTab === 'all' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredCustomers.map(customer => {
-                const pkg = packages.find(p => p.id === customer.packageId);
-                // Check package expiry
-                const pkgExpiryDate = customer.membershipRenewalDate ? new Date(customer.membershipRenewalDate) : null;
-                const pkgIsExpired = pkgExpiryDate ? new Date() > pkgExpiryDate : false;
-                
-                // Check Club Membership
-                const clubExpiry = customer.membershipExpiry ? new Date(customer.membershipExpiry) : null;
-                const isClubMember = customer.isMember && clubExpiry && clubExpiry > new Date();
-                
-                // Active Coupons Count
-                const activeCoupons = customer.activeCoupons?.filter(c => !c.isRedeemed && new Date(c.expiryDate) > new Date()) || [];
-
-                return (
-                <div key={customer.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 flex flex-col cursor-pointer hover:shadow-md transition">
-                    <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center">
-                            <div className="h-12 w-12 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">
-                                <User size={24} />
-                            </div>
-                            <div className="ml-4">
-                                <div className="flex items-center gap-2">
-                                    <h3 className="text-lg font-bold text-gray-900">{customer.name}</h3>
-                                    {isClubMember && <Star size={16} className="text-yellow-500 fill-yellow-500" title="Club Member" />}
-                                </div>
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); openModal(customer); }} 
-                                    className="text-xs text-indigo-600 hover:text-indigo-800 underline"
-                                >
-                                    Edit
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg p-3 mb-4 border border-gray-200 flex justify-between items-center relative overflow-hidden">
-                        <div>
-                            <p className="text-xs text-gray-500 uppercase font-semibold">Wallet Balance</p>
-                            <p className="text-xl font-bold text-gray-900">₹{customer.walletBalance.toLocaleString()}</p>
-                        </div>
-                        {isAdmin && (
-                            <button 
-                                onClick={(e) => { e.stopPropagation(); openWalletModal(customer); }}
-                                className="bg-white border border-gray-300 p-2 rounded-full hover:bg-gray-50 text-green-600 z-10"
-                                title="Add Funds / Buy Membership"
-                            >
-                                <Wallet size={18} />
-                            </button>
-                        )}
-                        {pkg && (
-                            <div className="absolute right-14 top-2 opacity-10">
-                                <Crown size={40} />
-                            </div>
-                        )}
-                    </div>
-
-                    {isClubMember && (
-                         <div className="mb-2 text-xs bg-yellow-50 text-yellow-800 rounded px-2 py-1 flex items-center border border-yellow-200">
-                             <Star size={12} className="mr-1"/> Club Member (Exp: {new Date(customer.membershipExpiry!).toLocaleDateString()})
-                         </div>
-                    )}
+        <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {paginatedCustomers.map(customer => {
+                    const pkg = packages.find(p => p.id === customer.packageId);
+                    // Check package expiry
+                    const pkgExpiryDate = customer.membershipRenewalDate ? new Date(customer.membershipRenewalDate) : null;
+                    const pkgIsExpired = pkgExpiryDate ? new Date() > pkgExpiryDate : false;
                     
-                    {pkg && pkgExpiryDate && (
-                        <div className={`mb-4 text-xs rounded-md p-2 flex items-center ${pkgIsExpired ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'}`}>
-                            {pkgIsExpired ? <AlertCircle size={14} className="mr-2"/> : <Clock size={14} className="mr-2"/>}
-                            <span>
-                                {pkgIsExpired ? 'Package Expired on ' : 'Package Expires: '}
-                                {pkgExpiryDate.toLocaleDateString()}
-                            </span>
-                        </div>
-                    )}
+                    // Check Club Membership
+                    const clubExpiry = customer.membershipExpiry ? new Date(customer.membershipExpiry) : null;
+                    const isClubMember = customer.isMember && clubExpiry && clubExpiry > new Date();
+                    
+                    // Active Coupons Count
+                    const activeCoupons = customer.activeCoupons?.filter(c => !c.isRedeemed && new Date(c.expiryDate) > new Date()) || [];
 
-                    {/* Active Coupons Section */}
-                    {activeCoupons.length > 0 && (
-                        <div className="mb-4">
-                            <p className="text-xs font-semibold text-gray-500 mb-1">Active Coupons</p>
-                            <div className="flex flex-wrap gap-2">
-                                {activeCoupons.map((c) => (
-                                    <div key={c.id} className="flex items-center bg-purple-50 border border-purple-100 text-purple-700 text-xs px-2 py-1 rounded">
-                                        <TicketPercent size={12} className="mr-1" />
-                                        <span className="font-mono font-bold mr-1">{c.code}</span>
-                                        <span className="text-[10px] text-purple-400">(Exp: {new Date(c.expiryDate).toLocaleDateString()})</span>
+                    return (
+                    <div key={customer.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 flex flex-col cursor-pointer hover:shadow-md transition">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center">
+                                <div className="h-12 w-12 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">
+                                    <User size={24} />
+                                </div>
+                                <div className="ml-4">
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-lg font-bold text-gray-900">{customer.name}</h3>
+                                        {isClubMember && (
+                                            <span title="Club Member">
+                                                <Star size={16} className="text-yellow-500 fill-yellow-500" />
+                                            </span>
+                                        )}
                                     </div>
-                                ))}
+                                    <button 
+                                        onClick={(e) => { e.stopPropagation(); openModal(customer); }} 
+                                        className="text-xs text-indigo-600 hover:text-indigo-800 underline"
+                                    >
+                                        Edit
+                                    </button>
+                                </div>
                             </div>
                         </div>
-                    )}
-                    
-                    <div className="space-y-2 mt-auto">
-                        <div className="flex items-center text-gray-600 text-sm">
-                            <Phone size={16} className="mr-2 text-gray-400" /> {customer.phone}
+
+                        <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg p-3 mb-4 border border-gray-200 flex justify-between items-center relative overflow-hidden">
+                            <div>
+                                <p className="text-xs text-gray-500 uppercase font-semibold">Wallet Balance</p>
+                                <p className="text-xl font-bold text-gray-900">₹{customer.walletBalance.toLocaleString()}</p>
+                            </div>
+                            {isAdmin && (
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); openWalletModal(customer); }}
+                                    className="bg-white border border-gray-300 p-2 rounded-full hover:bg-gray-50 text-green-600 z-10"
+                                    title="Add Funds / Buy Membership"
+                                >
+                                    <Wallet size={18} />
+                                </button>
+                            )}
+                            {pkg && (
+                                <div className="absolute right-14 top-2 opacity-10">
+                                    <Crown size={40} />
+                                </div>
+                            )}
                         </div>
-                        {customer.apartment && (
-                            <div className="flex items-center text-gray-600 text-sm">
-                                <Home size={16} className="mr-2 text-gray-400" /> {customer.apartment}
+
+                        {isClubMember && (
+                            <div className="mb-2 text-xs bg-yellow-50 text-yellow-800 rounded px-2 py-1 flex items-center border border-yellow-200">
+                                <Star size={12} className="mr-1"/> Club Member (Exp: {new Date(customer.membershipExpiry!).toLocaleDateString()})
                             </div>
                         )}
-                        <div className="flex gap-4 pt-2 border-t border-gray-100">
-                            {customer.birthday && (
-                                <div className="flex items-center text-gray-600 text-sm" title="Birthday">
-                                    <Cake size={16} className="mr-2 text-rose-400" /> 
-                                    {new Date(customer.birthday).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        
+                        {pkg && pkgExpiryDate && (
+                            <div className={`mb-4 text-xs rounded-md p-2 flex items-center ${pkgIsExpired ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'}`}>
+                                {pkgIsExpired ? <AlertCircle size={14} className="mr-2"/> : <Clock size={14} className="mr-2"/>}
+                                <span>
+                                    {pkgIsExpired ? 'Package Expired on ' : 'Package Expires: '}
+                                    {pkgExpiryDate.toLocaleDateString()}
+                                </span>
+                            </div>
+                        )}
+
+                        {/* Active Coupons Section */}
+                        {activeCoupons.length > 0 && (
+                            <div className="mb-4">
+                                <p className="text-xs font-semibold text-gray-500 mb-1">Active Coupons</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {activeCoupons.map((c) => (
+                                        <div key={c.id} className="flex items-center bg-purple-50 border border-purple-100 text-purple-700 text-xs px-2 py-1 rounded">
+                                            <TicketPercent size={12} className="mr-1" />
+                                            <span className="font-mono font-bold mr-1">{c.code}</span>
+                                            <span className="text-[10px] text-purple-400">(Exp: {new Date(c.expiryDate).toLocaleDateString()})</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        
+                        <div className="space-y-2 mt-auto">
+                            <div className="flex items-center text-gray-600 text-sm">
+                                <Phone size={16} className="mr-2 text-gray-400" /> {customer.phone}
+                            </div>
+                            {customer.apartment && (
+                                <div className="flex items-center text-gray-600 text-sm">
+                                    <Home size={16} className="mr-2 text-gray-400" /> {customer.apartment}
                                 </div>
                             )}
-                            {customer.anniversary && (
-                                <div className="flex items-center text-gray-600 text-sm" title="Anniversary">
-                                    <Heart size={16} className="mr-2 text-rose-400" /> 
-                                    {new Date(customer.anniversary).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                </div>
-                            )}
+                            <div className="flex gap-4 pt-2 border-t border-gray-100">
+                                {customer.birthday && (
+                                    <div className="flex items-center text-gray-600 text-sm" title="Birthday">
+                                        <Cake size={16} className="mr-2 text-rose-400" /> 
+                                        {new Date(customer.birthday).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                    </div>
+                                )}
+                                {customer.anniversary && (
+                                    <div className="flex items-center text-gray-600 text-sm" title="Anniversary">
+                                        <Heart size={16} className="mr-2 text-rose-400" /> 
+                                        {new Date(customer.anniversary).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <div className="mt-4 pt-3 border-t border-gray-100 flex gap-2">
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); openHistoryModal(customer); }}
+                                className="flex-1 flex items-center justify-center py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-md transition-colors border border-gray-200"
+                            >
+                                <History size={16} className="mr-2" /> History
+                            </button>
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); openCouponModal(customer); }}
+                                className="flex-1 flex items-center justify-center py-2 text-sm text-purple-600 hover:bg-purple-50 rounded-md transition-colors border border-purple-200 font-medium"
+                            >
+                                <TicketPercent size={16} className="mr-2" /> Coupon
+                            </button>
                         </div>
                     </div>
-                    <div className="mt-4 pt-3 border-t border-gray-100 flex gap-2">
-                        <button 
-                            onClick={(e) => { e.stopPropagation(); openHistoryModal(customer); }}
-                            className="flex-1 flex items-center justify-center py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-md transition-colors border border-gray-200"
-                        >
-                            <History size={16} className="mr-2" /> History
-                        </button>
-                        <button 
-                            onClick={(e) => { e.stopPropagation(); openCouponModal(customer); }}
-                            className="flex-1 flex items-center justify-center py-2 text-sm text-purple-600 hover:bg-purple-50 rounded-md transition-colors border border-purple-200 font-medium"
-                        >
-                            <TicketPercent size={16} className="mr-2" /> Coupon
-                        </button>
-                    </div>
+                )})}
+            </div>
+            
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+                <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-200">
+                    <button 
+                        onClick={goToPrevPage}
+                        disabled={currentPage === 1}
+                        className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                    >
+                        Previous
+                    </button>
+                    <span className="text-sm text-gray-700">
+                        Page {currentPage} of {totalPages}
+                    </span>
+                    <button 
+                        onClick={goToNextPage}
+                        disabled={currentPage === totalPages}
+                        className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                    >
+                        Next
+                    </button>
                 </div>
-            )})}
-        </div>
+            )}
+        </>
       )}
 
       {activeTab === 'upcoming' && (

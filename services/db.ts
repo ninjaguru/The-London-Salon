@@ -5,29 +5,114 @@ import {
 } from '../types';
 import { sheetsService } from './sheets';
 
-// Initial Seed Data - CLEARED
-const INITIAL_STAFF: Staff[] = [];
-const INITIAL_CATEGORIES: Category[] = [];
-const INITIAL_SERVICES: Service[] = [];
-const INITIAL_COMBOS: Combo[] = [];
-const INITIAL_PRODUCTS: Product[] = [];
-const INITIAL_PACKAGES: Package[] = [];
-const INITIAL_CUSTOMERS: Customer[] = [];
-const INITIAL_LEADS: Lead[] = [];
-const INITIAL_APPOINTMENTS: Appointment[] = [];
-const INITIAL_SALES: Sale[] = [];
-const INITIAL_NOTIFICATIONS: Notification[] = [];
-
 // Helper: Get Current Date in IST (YYYY-MM-DD)
 export const getTodayIST = (): string => {
   // Returns YYYY-MM-DD in Asia/Kolkata timezone
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 };
 
-export const createNotification = (type: 'reminder' | 'alert' | 'info' | 'staff', title: string, message: string, relatedId?: string) => {
-  const notifications = db.notifications.getAll();
+// Helper: Safe ID Generator
+export const generateId = (): string => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback for environments where crypto.randomUUID is not available
+  return Math.random().toString(36).substring(2) + Date.now().toString(36);
+};
+
+// Initial Empty Data
+const INITIAL_STAFF: Staff[] = [];
+const INITIAL_CATEGORIES: Category[] = [];
+const INITIAL_SERVICES: Service[] = [];
+const INITIAL_COMBOS: Combo[] = [];
+const INITIAL_PRODUCTS: Product[] = [];
+const INITIAL_PACKAGES: Package[] = [];
+const INITIAL_CUSTOMERS: Customer[] = []; 
+const INITIAL_LEADS: Lead[] = [];
+const INITIAL_APPOINTMENTS: Appointment[] = [];
+const INITIAL_SALES: Sale[] = [];
+const INITIAL_NOTIFICATIONS: Notification[] = [];
+const INITIAL_COUPON_TEMPLATES: CouponTemplate[] = [];
+
+class StorageService<T> {
+  private key: string;
+  private initialData: T[];
+  private tableName: string; // For Google Sheets mapping
+
+  constructor(key: string, initialData: T[], tableName: string) {
+    this.key = key;
+    this.initialData = initialData;
+    this.tableName = tableName;
+  }
+
+  getAll(): T[] {
+    try {
+        const stored = localStorage.getItem(this.key);
+        if (!stored) {
+            try {
+                // Initialize Local Storage ONLY.
+                localStorage.setItem(this.key, JSON.stringify(this.initialData));
+            } catch (e) {
+                console.warn(`LocalStorage write failed for ${this.key}`, e);
+            }
+            return this.initialData;
+        }
+        return JSON.parse(stored);
+    } catch (e) {
+        console.error(`LocalStorage access failed for ${this.key}`, e);
+        return this.initialData;
+    }
+  }
+
+  save(data: T[]) {
+    try {
+        localStorage.setItem(this.key, JSON.stringify(data));
+        // Trigger background sync to sheets if configured
+        if (sheetsService.isConfigured()) {
+            sheetsService.write(this.tableName, data).then(() => console.log(`Synced ${this.tableName}`));
+        }
+        // Dispatch event for UI reactivity
+        window.dispatchEvent(new Event('db-updated'));
+    } catch (e) {
+        console.error(`LocalStorage save failed for ${this.key}`, e);
+    }
+  }
+
+  add(item: T) {
+    const current = this.getAll();
+    this.save([item, ...current]);
+  }
+  
+  // Method to override local data with cloud data (without triggering write back)
+  overrideLocal(data: T[]) {
+      try {
+          localStorage.setItem(this.key, JSON.stringify(data));
+          window.dispatchEvent(new Event('db-updated'));
+      } catch (e) {
+          console.error(`LocalStorage override failed for ${this.key}`, e);
+      }
+  }
+}
+
+// Storage Keys - Updated to v6 to clear previous bad data/cache
+export const db = {
+  staff: new StorageService<Staff>('salon_staff_v6', INITIAL_STAFF, 'Staff'),
+  categories: new StorageService<Category>('salon_categories_v6', INITIAL_CATEGORIES, 'Categories'),
+  services: new StorageService<Service>('salon_services_v6', INITIAL_SERVICES, 'Services'),
+  combos: new StorageService<Combo>('salon_combos_v6', INITIAL_COMBOS, 'Combos'),
+  inventory: new StorageService<Product>('salon_inventory_v6', INITIAL_PRODUCTS, 'Inventory'),
+  packages: new StorageService<Package>('salon_packages_v6', INITIAL_PACKAGES, 'Packages'),
+  customers: new StorageService<Customer>('salon_customers_v6', INITIAL_CUSTOMERS, 'Customers'),
+  leads: new StorageService<Lead>('salon_leads_v6', INITIAL_LEADS, 'Leads'),
+  appointments: new StorageService<Appointment>('salon_appointments_v6', INITIAL_APPOINTMENTS, 'Appointments'),
+  sales: new StorageService<Sale>('salon_sales_v6', INITIAL_SALES, 'Sales'),
+  notifications: new StorageService<Notification>('salon_notifications_v6', INITIAL_NOTIFICATIONS, 'Notifications'),
+  couponTemplates: new StorageService<CouponTemplate>('salon_coupon_templates_v6', INITIAL_COUPON_TEMPLATES, 'CouponTemplates')
+};
+
+export const createNotification = (type: Notification['type'], title: string, message: string, relatedId?: string) => {
   const newNotif: Notification = {
-    id: crypto.randomUUID(),
+    id: generateId(),
     type,
     title,
     message,
@@ -35,172 +120,111 @@ export const createNotification = (type: 'reminder' | 'alert' | 'info' | 'staff'
     read: false,
     relatedId
   };
-  db.notifications.save([newNotif, ...notifications]);
+  db.notifications.add(newNotif);
 };
 
 export const exportToCSV = (data: any[], filename: string) => {
   if (!data || !data.length) {
-    alert("No data to export");
+    alert('No data to export');
     return;
   }
-  const headers = Object.keys(data[0]).join(',');
-  const rows = data.map(obj => 
-    Object.values(obj).map(val => {
-        if (typeof val === 'object') return `"${JSON.stringify(val).replace(/"/g, '""')}"`;
-        return `"${String(val).replace(/"/g, '""')}"`;
-    }).join(',')
-  ).join('\n');
-  
-  const blob = new Blob([headers + '\n' + rows], { type: 'text/csv' });
-  const url = window.URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${filename}_${getTodayIST()}.csv`;
-  a.click();
+  const headers = Object.keys(data[0]);
+  const csvContent = [
+    headers.join(','),
+    ...data.map(row => headers.map(header => {
+      const val = row[header];
+      // Escape quotes and wrap in quotes if string contains comma
+      const formatted = typeof val === 'string' ? `"${val.replace(/"/g, '""')}"` : val;
+      return formatted;
+    }).join(','))
+  ].join('\n');
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  if (link.download !== undefined) {
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${filename}_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
 };
 
+// Sync Logic
 export const syncFromCloud = async () => {
-  if (!sheetsService.isConfigured()) {
-    return { success: false, message: 'Google Sheets not configured.' };
-  }
+    if (!sheetsService.isConfigured()) return { success: false, message: 'Cloud not configured' };
+    
+    try {
+        const response = await sheetsService.readAll();
+        if (response.status === 'success' && response.data) {
+            const cloudData = response.data;
+            
+            // Override local stores with cloud data
+            if (cloudData['Staff']) db.staff.overrideLocal(cloudData['Staff']);
+            if (cloudData['Categories']) db.categories.overrideLocal(cloudData['Categories']);
+            if (cloudData['Services']) db.services.overrideLocal(cloudData['Services']);
+            if (cloudData['Combos']) db.combos.overrideLocal(cloudData['Combos']);
+            if (cloudData['Inventory']) db.inventory.overrideLocal(cloudData['Inventory']);
+            if (cloudData['Packages']) db.packages.overrideLocal(cloudData['Packages']);
+            if (cloudData['Leads']) db.leads.overrideLocal(cloudData['Leads']);
+            if (cloudData['Sales']) db.sales.overrideLocal(cloudData['Sales']);
+            if (cloudData['CouponTemplates']) db.couponTemplates.overrideLocal(cloudData['CouponTemplates']);
+            
+            // Special handling for Customers and Appointments to sanitize Dates
+            if (cloudData['Customers']) {
+                const cleanCustomers = cloudData['Customers'].map((c: any) => {
+                    let parsedCoupons = [];
+                    try {
+                        if (typeof c.activeCoupons === 'string') {
+                            parsedCoupons = JSON.parse(c.activeCoupons);
+                        } else if (Array.isArray(c.activeCoupons)) {
+                            parsedCoupons = c.activeCoupons;
+                        }
+                    } catch (e) {
+                        parsedCoupons = [];
+                    }
 
-  // 1. Pull data from Sheets
-  const result = await sheetsService.readAll();
-  if (result.status === 'error') {
-    return { success: false, message: result.message || 'Sync failed' };
-  }
+                    return {
+                        ...c,
+                        // Ensure dates are YYYY-MM-DD (fix 1899 issue)
+                        birthday: c.birthday && c.birthday.toString().includes('T') ? c.birthday.split('T')[0] : c.birthday,
+                        anniversary: c.anniversary && c.anniversary.toString().includes('T') ? c.anniversary.split('T')[0] : c.anniversary,
+                        // Ensure activeCoupons is always an array
+                        activeCoupons: parsedCoupons || []
+                    };
+                });
+                db.customers.overrideLocal(cleanCustomers);
+            }
 
-  const data = result.data;
-  if (!data) return { success: false, message: 'No data found in sheet' };
+            if (cloudData['Appointments']) {
+                const cleanAppts = cloudData['Appointments'].map((a: any) => ({
+                    ...a,
+                    // Ensure date is YYYY-MM-DD
+                    date: a.date && a.date.toString().includes('T') ? a.date.split('T')[0] : a.date,
+                    // Ensure time is HH:MM
+                    time: a.time && a.time.toString().includes('T') ? new Date(a.time).toLocaleTimeString('en-GB', {hour: '2-digit', minute: '2-digit'}) : a.time
+                }));
+                db.appointments.overrideLocal(cleanAppts);
+            }
 
-  // 2. Override Local Storage
-  db.overrideLocal(data);
-
-  return { success: true, message: 'Sync complete. Data updated from cloud.' };
+            return { success: true, message: 'Data synchronized from cloud.' };
+        } else {
+            return { success: false, message: response.message || 'Sync failed' };
+        }
+    } catch (e) {
+        console.error(e);
+        return { success: false, message: 'Network error during sync' };
+    }
 };
 
-class StorageService {
-  private createStore<T>(key: string, initialData: T[], tableName: string) {
-    return {
-      getAll: (): T[] => {
-        const stored = localStorage.getItem(key);
-        if (!stored) {
-          localStorage.setItem(key, JSON.stringify(initialData));
-          return initialData;
-        }
-        try {
-            return JSON.parse(stored);
-        } catch(e) {
-            return initialData;
-        }
-      },
-      save: (data: T[]) => {
-        localStorage.setItem(key, JSON.stringify(data));
-        // Auto-push to sheets if configured
-        if (sheetsService.isConfigured()) {
-            sheetsService.write(tableName, data).then(res => {
-                if (res.status === 'error') console.error(`Failed to push ${tableName} to cloud`);
-            });
-        }
-        // Dispatch event for UI updates
-        window.dispatchEvent(new Event('db-updated'));
-      },
-      add: (item: T) => {
-        const current = this.createStore<T>(key, initialData, tableName).getAll();
-        const updated = [item, ...current];
-        this.createStore<T>(key, initialData, tableName).save(updated);
-      },
-      key,
-      tableName
-    };
-  }
-
-  staff = this.createStore<Staff>('salon_staff_v4_clean', INITIAL_STAFF, 'Staff');
-  categories = this.createStore<Category>('salon_categories_v4_clean', INITIAL_CATEGORIES, 'Categories');
-  services = this.createStore<Service>('salon_services_v4_clean', INITIAL_SERVICES, 'Services');
-  combos = this.createStore<Combo>('salon_combos_v4_clean', INITIAL_COMBOS, 'Combos');
-  inventory = this.createStore<Product>('salon_inventory_v4_clean', INITIAL_PRODUCTS, 'Inventory');
-  packages = this.createStore<Package>('salon_packages_v4_clean', INITIAL_PACKAGES, 'Packages');
-  customers = this.createStore<Customer>('salon_customers_v4_clean', INITIAL_CUSTOMERS, 'Customers');
-  leads = this.createStore<Lead>('salon_leads_v4_clean', INITIAL_LEADS, 'Leads');
-  appointments = this.createStore<Appointment>('salon_appointments_v4_clean', INITIAL_APPOINTMENTS, 'Appointments');
-  sales = this.createStore<Sale>('salon_sales_v4_clean', INITIAL_SALES, 'Sales');
-  notifications = this.createStore<Notification>('salon_notifications_v4_clean', INITIAL_NOTIFICATIONS, 'Notifications');
-  couponTemplates = this.createStore<CouponTemplate>('salon_coupon_templates_v4_clean', [], 'CouponTemplates');
-
-  // Helper for offline pagination simulation
-  getPaginated<T>(tableName: string, page: number, pageSize: number): { data: T[], total: number } {
-    let allData: any[] = [];
-    switch(tableName) {
-        case 'Customers': allData = this.customers.getAll(); break;
-        case 'Appointments': allData = this.appointments.getAll(); break;
-        default: return { data: [], total: 0 };
-    }
-    
+// Helper for local pagination (if needed)
+export const getPaginated = <T>(data: T[], page: number, pageSize: number): { data: T[], total: number } => {
     const start = (page - 1) * pageSize;
     const end = start + pageSize;
     return {
-        data: allData.slice(start, end),
-        total: allData.length
+        data: data.slice(start, end),
+        total: data.length
     };
-  }
-
-  // Helper to bulk override local data from cloud sync result
-  overrideLocal(cloudData: any) {
-    // SANITIZATION LOGIC: Fix Dates/Times from Google Sheets ISO strings
-    
-    // 1. Sanitize Appointments
-    if (cloudData.Appointments) {
-        cloudData.Appointments = cloudData.Appointments.map((appt: any) => {
-            // Fix Date (convert ISO to YYYY-MM-DD IST)
-            if (appt.date && typeof appt.date === 'string' && appt.date.includes('T')) {
-                // If the sheet Date column has a time component or is an ISO string, format it strictly to YYYY-MM-DD
-                appt.date = new Date(appt.date).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
-            }
-            
-            // Fix Time (extract HH:MM from ISO string if present)
-            if (appt.time && typeof appt.time === 'string' && appt.time.includes('T')) {
-                // Sheets often returns time columns as 1899-12-30Txx:xx:xx.xxxZ
-                const d = new Date(appt.time);
-                const hours = d.getHours().toString().padStart(2, '0');
-                const minutes = d.getMinutes().toString().padStart(2, '0');
-                appt.time = `${hours}:${minutes}`;
-            }
-            return appt;
-        });
-    }
-
-    // 2. Sanitize Customers (Birthdays/Anniversaries)
-    if (cloudData.Customers) {
-        cloudData.Customers = cloudData.Customers.map((c: any) => {
-             if (c.birthday && typeof c.birthday === 'string' && c.birthday.includes('T')) {
-                 c.birthday = new Date(c.birthday).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
-             }
-             if (c.anniversary && typeof c.anniversary === 'string' && c.anniversary.includes('T')) {
-                 c.anniversary = new Date(c.anniversary).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
-             }
-             // Ensure activeCoupons is an array (Sheets might return string)
-             if (c.activeCoupons && typeof c.activeCoupons === 'string') {
-                 try { c.activeCoupons = JSON.parse(c.activeCoupons); } catch(e) { c.activeCoupons = []; }
-             }
-             return c;
-        });
-    }
-
-    const stores = [
-        this.staff, this.categories, this.services, this.combos, this.inventory, 
-        this.packages, this.customers, this.leads, this.appointments, this.sales, 
-        this.notifications, this.couponTemplates
-    ];
-
-    stores.forEach(store => {
-        if (cloudData[store.tableName]) {
-            localStorage.setItem(store.key, JSON.stringify(cloudData[store.tableName]));
-        }
-    });
-    
-    window.dispatchEvent(new Event('db-updated'));
-  }
-}
-
-export const db = new StorageService();
+};

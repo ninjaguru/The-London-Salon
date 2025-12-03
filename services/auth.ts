@@ -16,11 +16,11 @@ export const authService = {
                 // Hardcoded credentials
                 if (username === 'ninja' && password === 'Q1p0w2o9#$') {
                     const user = USERS[0];
-                    localStorage.setItem(AUTH_KEY, JSON.stringify(user));
+                    try { localStorage.setItem(AUTH_KEY, JSON.stringify(user)); } catch(e){}
                     resolve(user);
                 } else if (username === 'manager' && password === 'TlsManage#$') {
                     const user = USERS[1];
-                    localStorage.setItem(AUTH_KEY, JSON.stringify(user));
+                    try { localStorage.setItem(AUTH_KEY, JSON.stringify(user)); } catch(e){}
                     resolve(user);
                 } else {
                     resolve(null);
@@ -30,13 +30,13 @@ export const authService = {
     },
 
     logout: () => {
-        localStorage.removeItem(AUTH_KEY);
+        try { localStorage.removeItem(AUTH_KEY); } catch(e){}
     },
 
     getCurrentUser: (): User | null => {
-        const stored = localStorage.getItem(AUTH_KEY);
-        if (!stored) return null;
         try {
+            const stored = localStorage.getItem(AUTH_KEY);
+            if (!stored) return null;
             return JSON.parse(stored);
         } catch (e) {
             return null;
@@ -44,6 +44,10 @@ export const authService = {
     },
 
     isAuthenticated: (): boolean => {
-        return !!localStorage.getItem(AUTH_KEY);
+        try {
+            return !!localStorage.getItem(AUTH_KEY);
+        } catch (e) {
+            return false;
+        }
     }
 };

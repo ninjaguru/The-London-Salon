@@ -15,22 +15,26 @@ const DEFAULT_VIEW_URL = 'https://docs.google.com/spreadsheets/d/1XQxJD-qSNQZZqM
 export const sheetsService = {
   // Get the configured Web App URL (or default)
   getScriptUrl: (): string => {
-    return localStorage.getItem(STORAGE_KEY_URL) || DEFAULT_SCRIPT_URL;
+    try {
+        return localStorage.getItem(STORAGE_KEY_URL) || DEFAULT_SCRIPT_URL;
+    } catch(e) { return DEFAULT_SCRIPT_URL; }
   },
 
   // Save the Web App URL
   setScriptUrl: (url: string) => {
-    localStorage.setItem(STORAGE_KEY_URL, url);
+    try { localStorage.setItem(STORAGE_KEY_URL, url); } catch(e) {}
   },
 
   // Get the configured Spreadsheet View URL (or default)
   getViewUrl: (): string => {
-    return localStorage.getItem(STORAGE_KEY_VIEW_URL) || DEFAULT_VIEW_URL;
+    try {
+        return localStorage.getItem(STORAGE_KEY_VIEW_URL) || DEFAULT_VIEW_URL;
+    } catch(e) { return DEFAULT_VIEW_URL; }
   },
 
   // Save the Spreadsheet View URL
   setViewUrl: (url: string) => {
-    localStorage.setItem(STORAGE_KEY_VIEW_URL, url);
+    try { localStorage.setItem(STORAGE_KEY_VIEW_URL, url); } catch(e) {}
   },
 
   // Check if configured (Always true now due to defaults)
@@ -53,20 +57,32 @@ export const sheetsService = {
     }
   },
 
+  // Read a specific page of data (Pull Pagination)
+  readPage: async (tableName: string, page: number, pageSize: number): Promise<SheetResponse> => {
+    const url = sheetsService.getScriptUrl();
+    if (!url) return { status: 'error', message: 'Script URL not configured' };
+
+    try {
+      const response = await fetch(`${url}?action=readPage&table=${tableName}&page=${page}&pageSize=${pageSize}`);
+      const json = await response.json();
+      return json;
+    } catch (error) {
+      console.error('Sheets Read Page Error:', error);
+      return { status: 'error', message: 'Failed to fetch page from Google Sheets' };
+    }
+  },
+
   // Write specific table data (Push)
   write: async (tableName: string, data: any[]): Promise<SheetResponse> => {
     const url = sheetsService.getScriptUrl();
     if (!url) return { status: 'error', message: 'Script URL not configured' };
 
     try {
-      // We use POST with 'no-cors' if using pure fetch in some envs, but GAS web app usually supports CORS if deployed correctly.
-      // However, to send JSON body to GAS `doPost`, we usually need text/plain to avoid preflight issues in some strict browser sandboxes,
-      // or rely on the script handling standard CORS. 
-      
+      // We use POST with text/plain to avoid CORS preflight issues in some restricted environments
       const response = await fetch(url, {
         method: 'POST',
         headers: {
-          'Content-Type': 'text/plain;charset=utf-8', // Bypass complex CORS preflight
+          'Content-Type': 'text/plain;charset=utf-8', 
         },
         body: JSON.stringify({
           action: 'write',
@@ -107,6 +123,8 @@ function handleRequest(e) {
     
     if (action === 'readAll') {
       return readAllTables();
+    } else if (action === 'readPage') {
+      return readTablePage(e.parameter.table, e.parameter.page, e.parameter.pageSize);
     } else if (action === 'write') {
       const body = JSON.parse(e.postData.contents);
       return writeTable(body.tab, body.data);
@@ -127,15 +145,68 @@ function readAllTables() {
 
   sheets.forEach(sheet => {
     const name = sheet.getName();
-    const data = sheet.getDataRange().getValues();
-    if (data.length > 1) {
-      const headers = data[0];
-      const rows = data.slice(1);
-      result[name] = rows.map(row => {
+    // For large tables like Customers/Appointments, limit initial sync to first 20 rows to prevent timeout
+    let limit = -1; 
+    if (name === 'Customers' || name === 'Appointments') {
+        limit = 21; // Header + 20 rows
+    }
+
+    const lastRow = sheet.getLastRow();
+    const lastCol = sheet.getLastColumn();
+    
+    if (lastRow > 1) {
+        const rowsToRead = (limit > 0 && limit < lastRow) ? limit : lastRow;
+        const data = sheet.getRange(1, 1, rowsToRead, lastCol).getValues();
+        
+        const headers = data[0];
+        const rows = data.slice(1);
+        result[name] = rows.map(row => {
+            const obj = {};
+            headers.forEach((h, i) => {
+            let val = row[i];
+            // Try to parse JSON strings back to objects
+            if (typeof val === 'string' && (val.startsWith('[') || val.startsWith('{'))) {
+                try { val = JSON.parse(val); } catch(e) {}
+            }
+            obj[h] = val;
+            });
+            return obj;
+        });
+    } else {
+      result[name] = [];
+    }
+  });
+
+  return response({status: 'success', data: result});
+}
+
+function readTablePage(tableName, page, pageSize) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(tableName);
+  
+  if (!sheet) return response({status: 'error', message: 'Table not found'});
+
+  const p = parseInt(page) || 1;
+  const ps = parseInt(pageSize) || 20;
+  const startRow = (p - 1) * ps + 2; // +2 because row 1 is header
+  
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  
+  if (lastRow <= 1) return response({status: 'success', data: [], total: 0});
+  
+  // Get Headers
+  const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  
+  // Get Data
+  let rows = [];
+  if (startRow <= lastRow) {
+      const rowsToRead = Math.min(ps, lastRow - startRow + 1);
+      const data = sheet.getRange(startRow, 1, rowsToRead, lastCol).getValues();
+      rows = data.map(row => {
         const obj = {};
         headers.forEach((h, i) => {
           let val = row[i];
-          // Try to parse JSON strings back to objects (for arrays/objects stored as string)
           if (typeof val === 'string' && (val.startsWith('[') || val.startsWith('{'))) {
             try { val = JSON.parse(val); } catch(e) {}
           }
@@ -143,12 +214,14 @@ function readAllTables() {
         });
         return obj;
       });
-    } else {
-      result[name] = [];
-    }
-  });
+  }
 
-  return response({status: 'success', data: result});
+  return response({
+      status: 'success', 
+      data: rows, 
+      total: lastRow - 1,
+      page: p
+  });
 }
 
 function writeTable(tabName, data) {
