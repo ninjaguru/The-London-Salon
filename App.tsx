@@ -19,6 +19,7 @@ import Services from './components/Services';
 import Coupons from './components/Coupons';
 import Settings from './components/Settings';
 import Login from './components/Login';
+import PublicMenu from './components/PublicMenu';
 import { authService } from './services/auth';
 
 // Guard component to check if user is logged in
@@ -26,36 +27,37 @@ const ProtectedRoute = ({ children }: { children?: React.ReactNode }) => {
   if (!authService.isAuthenticated()) {
     return <Navigate to="/login" replace />;
   }
-  return <>{children}</>;
+  return <Layout>{children}</Layout>;
 };
 
 const App: React.FC = () => {
   return (
     <MemoryRouter>
-      <Layout>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          
-          <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/staff" element={<ProtectedRoute><Staff /></ProtectedRoute>} />
-          <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
-          <Route path="/categories" element={<ProtectedRoute><Categories /></ProtectedRoute>} />
-          <Route path="/services" element={<ProtectedRoute><Services /></ProtectedRoute>} />
-          <Route path="/combos" element={<ProtectedRoute><Combos /></ProtectedRoute>} />
-          <Route path="/coupons" element={<ProtectedRoute><Coupons /></ProtectedRoute>} />
-          <Route path="/appointments" element={<ProtectedRoute><Appointments /></ProtectedRoute>} />
-          <Route path="/sales" element={<ProtectedRoute><Sales /></ProtectedRoute>} />
-          <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
-          <Route path="/leads" element={<ProtectedRoute><Leads /></ProtectedRoute>} />
-          <Route path="/packages" element={<ProtectedRoute><Packages /></ProtectedRoute>} />
-          <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
-          <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
-          <Route path="/assistant" element={<ProtectedRoute><AIAssistant /></ProtectedRoute>} />
-          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-          
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Layout>
+      <Routes>
+        {/* Public Facing Pages (No Layout) */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/menu" element={<PublicMenu />} />
+        
+        {/* Protected Dashboard Pages (With Layout) */}
+        <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/staff" element={<ProtectedRoute><Staff /></ProtectedRoute>} />
+        <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
+        <Route path="/categories" element={<ProtectedRoute><Categories /></ProtectedRoute>} />
+        <Route path="/services" element={<ProtectedRoute><Services /></ProtectedRoute>} />
+        <Route path="/combos" element={<ProtectedRoute><Combos /></ProtectedRoute>} />
+        <Route path="/coupons" element={<ProtectedRoute><Coupons /></ProtectedRoute>} />
+        <Route path="/appointments" element={<ProtectedRoute><Appointments /></ProtectedRoute>} />
+        <Route path="/sales" element={<ProtectedRoute><Sales /></ProtectedRoute>} />
+        <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
+        <Route path="/leads" element={<ProtectedRoute><Leads /></ProtectedRoute>} />
+        <Route path="/packages" element={<ProtectedRoute><Packages /></ProtectedRoute>} />
+        <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+        <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
+        <Route path="/assistant" element={<ProtectedRoute><AIAssistant /></ProtectedRoute>} />
+        <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+        
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </MemoryRouter>
   );
 };

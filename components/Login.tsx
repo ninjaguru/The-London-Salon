@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../services/auth';
@@ -31,7 +30,7 @@ const Login: React.FC = () => {
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="text-center">
             <img 
-              src="/logo.png" 
+              src="/logo.png?v=2" 
               alt="The London Salon" 
               className="mx-auto h-32 w-auto mb-6 object-contain"
             />

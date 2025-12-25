@@ -48,6 +48,7 @@ export interface Combo {
   price: number;
   description: string; // Comma separated services or details
   active: boolean;
+  gender: GenderTarget;
 }
 
 export interface Product {

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { db, exportToCSV } from '../services/db';
 import { authService } from '../services/auth';
-import { Combo } from '../types';
+import { Combo, GenderTarget } from '../types';
 import { Plus, Edit2, Trash2, Download, Layers } from 'lucide-react';
 import Modal from './ui/Modal';
 
@@ -19,7 +19,8 @@ const Combos: React.FC = () => {
       name: '',
       price: 0,
       description: '',
-      active: true
+      active: true,
+      gender: 'Unisex' as GenderTarget
   });
 
   useEffect(() => {
@@ -33,11 +34,12 @@ const Combos: React.FC = () => {
               name: combo.name,
               price: combo.price,
               description: combo.description,
-              active: combo.active
+              active: combo.active,
+              gender: combo.gender || 'Unisex'
           });
       } else {
           setEditingCombo(null);
-          setFormData({ name: '', price: 0, description: '', active: true });
+          setFormData({ name: '', price: 0, description: '', active: true, gender: 'Unisex' });
       }
       setIsModalOpen(true);
   };
@@ -50,7 +52,8 @@ const Combos: React.FC = () => {
           name: formData.name,
           price: Number(formData.price),
           description: formData.description,
-          active: formData.active
+          active: formData.active,
+          gender: formData.gender
       };
 
       if (editingCombo) {
@@ -108,9 +111,17 @@ const Combos: React.FC = () => {
                         </div>
                         <div>
                             <h3 className="text-lg font-bold text-gray-900">{combo.name}</h3>
-                            <span className={`text-[10px] px-2 py-0.5 rounded-full ${combo.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                                {combo.active ? 'Active' : 'Inactive'}
-                            </span>
+                            <div className="flex gap-1 mt-1">
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full ${combo.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                                    {combo.active ? 'Active' : 'Inactive'}
+                                </span>
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium 
+                                    ${combo.gender === 'Women' ? 'bg-pink-100 text-pink-800' : 
+                                      combo.gender === 'Men' ? 'bg-blue-100 text-blue-800' : 
+                                      'bg-purple-100 text-purple-800'}`}>
+                                    {combo.gender || 'Unisex'}
+                                </span>
+                            </div>
                         </div>
                     </div>
                     {isAdmin && (
@@ -126,8 +137,19 @@ const Combos: React.FC = () => {
                 </div>
 
                 <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded-md border border-gray-100">
-                    <p className="font-semibold text-gray-500 text-xs uppercase mb-1">Includes:</p>
-                    <p>{combo.description}</p>
+                    <p className="font-semibold text-gray-500 text-xs uppercase mb-2">Includes:</p>
+                    <ul className="space-y-1">
+                        {combo.description.split(/,|\n/).map((item, i) => {
+                            const trimmed = item.trim();
+                            if (!trimmed) return null;
+                            return (
+                                <li key={i} className="flex items-start">
+                                    <span className="text-rose-400 mr-2 font-bold">•</span>
+                                    <span>{trimmed}</span>
+                                </li>
+                            );
+                        })}
+                    </ul>
                 </div>
             </div>
         ))}
@@ -141,25 +163,39 @@ const Combos: React.FC = () => {
                     type="text" required value={formData.name} 
                     onChange={e => setFormData({...formData, name: e.target.value})} 
                     placeholder="e.g. Bridal Package"
-                    className="mt-1 block w-full border p-2 rounded-md border-gray-300" 
+                    className="mt-1 block w-full border p-2 rounded-md border-gray-300 shadow-sm focus:border-rose-500 focus:ring-rose-500" 
                 />
             </div>
-            <div>
-                <label className="block text-sm font-medium text-gray-700">Price (₹)</label>
-                <input 
-                    type="number" required value={formData.price} 
-                    onChange={e => setFormData({...formData, price: Number(e.target.value)})} 
-                    className="mt-1 block w-full border p-2 rounded-md border-gray-300" 
-                />
+            <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <label className="block text-sm font-medium text-gray-700">Price (₹)</label>
+                    <input 
+                        type="number" required value={formData.price} 
+                        onChange={e => setFormData({...formData, price: Number(e.target.value)})} 
+                        className="mt-1 block w-full border p-2 rounded-md border-gray-300 shadow-sm focus:border-rose-500 focus:ring-rose-500" 
+                    />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700">Target Gender</label>
+                    <select 
+                        value={formData.gender} 
+                        onChange={e => setFormData({...formData, gender: e.target.value as GenderTarget})}
+                        className="mt-1 block w-full border p-2 rounded-md border-gray-300 shadow-sm focus:border-rose-500 focus:ring-rose-500 bg-white"
+                    >
+                        <option value="Unisex">Unisex</option>
+                        <option value="Men">Men</option>
+                        <option value="Women">Women</option>
+                    </select>
+                </div>
             </div>
             <div>
-                <label className="block text-sm font-medium text-gray-700">Included Services / Description</label>
+                <label className="block text-sm font-medium text-gray-700">Included Services / Description (One per line or comma separated)</label>
                 <textarea 
                     required value={formData.description} 
                     onChange={e => setFormData({...formData, description: e.target.value})} 
-                    rows={3}
-                    placeholder="List services included..."
-                    className="mt-1 block w-full border p-2 rounded-md border-gray-300" 
+                    rows={4}
+                    placeholder="Service 1&#10;Service 2&#10;Service 3"
+                    className="mt-1 block w-full border p-2 rounded-md border-gray-300 shadow-sm focus:border-rose-500 focus:ring-rose-500" 
                 />
             </div>
             <div className="flex items-center">

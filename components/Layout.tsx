@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { 
@@ -189,7 +188,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { to: '/inventory', icon: ShoppingBag, label: 'Inventory' },
     { to: '/categories', icon: Tags, label: 'Categories' },
     { to: '/coupons', icon: TicketPercent, label: 'Coupons' },
-    { to: '/sales', icon: CreditCard, label: 'Sales' },
+    { to: '/sales', icon: CreditCard, label: 'Product Sales' },
     { to: '/packages', icon: Crown, label: 'Packages' },
     { to: '/assistant', icon: Sparkles, label: 'Smart Assistant', highlight: true },
   ];
@@ -220,11 +219,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       {/* Sidebar - Desktop */}
       <aside className="hidden md:flex md:flex-col w-64 bg-white border-r border-gray-200">
-        <div className="flex flex-col items-center justify-center h-28 border-b border-gray-100 p-4 bg-white">
+        <div className="flex flex-col items-center justify-center h-32 border-b border-gray-100 p-2 bg-white">
           <img 
-            src="/logo.png" 
+            src="/logo.png?v=2" 
             alt="The London Salon" 
-            className="h-full w-auto object-contain transition-all duration-300" 
+            className="max-h-full w-auto object-contain transition-all duration-300" 
           />
         </div>
         <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
@@ -248,7 +247,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <div className="mt-6 px-4 py-2 bg-gray-50 mx-2 rounded-md border border-gray-100">
               <div className="flex items-start text-xs text-gray-500">
                   <MapPin size={12} className="mt-0.5 mr-1 flex-shrink-0" />
-                  <p>Vibgyor High School Road, Thubarahalli, Whitefield, Bengaluru</p>
+                  <p>Vibgyor High School Road, Thubarahalli, Whitefield, Bengaluru, Karnataka 560066</p>
               </div>
           </div>
         </nav>
@@ -289,7 +288,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </div>
             <div className="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
               <div className="flex-shrink-0 flex items-center justify-center px-4 mb-4 border-b border-gray-100 pb-4 h-24">
-                 <img src="/logo.png" alt="The London Salon" className="h-full w-auto object-contain" />
+                 <img src="/logo.png?v=2" alt="The London Salon" className="h-full w-auto object-contain" />
               </div>
               <nav className="mt-2 px-2 space-y-1">
                 {navItems.map((item) => (

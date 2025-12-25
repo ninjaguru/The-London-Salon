@@ -2,13 +2,17 @@
 import React, { useState, useEffect } from 'react';
 import { sheetsService, GOOGLE_APPS_SCRIPT_CODE } from '../services/sheets';
 import { syncFromCloud } from '../services/db';
-import { Save, RefreshCw, CheckCircle, AlertCircle, Copy, FileSpreadsheet, ExternalLink } from 'lucide-react';
+import { Save, RefreshCw, CheckCircle, AlertCircle, Copy, FileSpreadsheet, ExternalLink, QrCode, Printer, Globe } from 'lucide-react';
 
 const Settings: React.FC = () => {
   const [scriptUrl, setScriptUrl] = useState('');
   const [viewUrl, setViewUrl] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
   const [statusMsg, setStatusMsg] = useState<{type: 'success' | 'error', text: string} | null>(null);
+
+  // QR Logic
+  const publicMenuUrl = `${window.location.origin}${window.location.pathname}#/menu`;
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(publicMenuUrl)}`;
 
   useEffect(() => {
     setScriptUrl(sheetsService.getScriptUrl());
@@ -44,11 +48,101 @@ const Settings: React.FC = () => {
     alert('Code copied to clipboard!');
   };
 
+  const printFlyer = () => {
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) return;
+
+      printWindow.document.write(`
+          <html>
+              <head>
+                  <title>Print Menu Flyer</title>
+                  <style>
+                      body { font-family: 'Inter', sans-serif; text-align: center; padding: 50px; }
+                      .container { border: 2px solid #e11d48; border-radius: 20px; padding: 40px; max-width: 500px; margin: auto; }
+                      h1 { color: #111827; margin-bottom: 10px; font-size: 24px; }
+                      p { color: #6b7280; margin-bottom: 30px; }
+                      .qr-box { background: white; padding: 20px; display: inline-block; border: 1px solid #eee; margin-bottom: 20px; }
+                      .logo { height: 100px; margin-bottom: 20px; }
+                      .footer { font-size: 12px; color: #9ca3af; margin-top: 40px; }
+                  </style>
+              </head>
+              <body>
+                  <div class="container">
+                      <img src="${window.location.origin}/logo.png" class="logo" />
+                      <h1>Scan to View Our Menu</h1>
+                      <p>Scan the code below to browse our latest services, combos, and wallet packages.</p>
+                      <div class="qr-box">
+                          <img src="${qrCodeUrl}" width="200" />
+                      </div>
+                      <div class="footer">The London Salon | Premium Hair & Beauty</div>
+                  </div>
+                  <script>window.onload = () => { window.print(); window.close(); }</script>
+              </body>
+          </html>
+      `);
+      printWindow.document.close();
+  };
+
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
+    <div className="max-w-4xl mx-auto space-y-8 pb-20">
       <div>
         <h2 className="text-2xl font-bold text-gray-800 mb-2">Settings</h2>
         <p className="text-gray-600">Configure external integrations and system preferences.</p>
+      </div>
+
+      {/* Public Menu Section */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center gap-3 mb-6">
+              <div className="bg-rose-100 p-2 rounded-lg text-rose-600">
+                  <Globe className="h-6 w-6" />
+              </div>
+              <div>
+                  <h3 className="text-lg font-bold text-gray-900">Public Service Menu</h3>
+                  <p className="text-sm text-gray-500">Your digital menu for customers to scan in-salon.</p>
+              </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+              <div className="space-y-4">
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                      <p className="text-xs font-bold text-gray-400 uppercase mb-2">Menu URL</p>
+                      <div className="flex items-center gap-2">
+                          <input 
+                            readOnly 
+                            value={publicMenuUrl} 
+                            className="bg-transparent text-sm text-gray-600 border-none p-0 focus:ring-0 flex-1 truncate"
+                          />
+                          <button 
+                            onClick={() => { navigator.clipboard.writeText(publicMenuUrl); alert('URL copied!'); }}
+                            className="text-rose-600 hover:text-rose-700"
+                          >
+                            <Copy size={16} />
+                          </button>
+                      </div>
+                  </div>
+                  <div className="flex gap-3">
+                      <a 
+                        href={publicMenuUrl} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="flex-1 bg-white border border-gray-300 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 hover:bg-gray-50"
+                      >
+                        <ExternalLink size={16} /> Preview
+                      </a>
+                      <button 
+                        onClick={printFlyer}
+                        className="flex-1 bg-rose-600 text-white py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 hover:bg-rose-700 shadow-sm"
+                      >
+                        <Printer size={16} /> Print Flyer
+                      </button>
+                  </div>
+              </div>
+
+              <div className="flex flex-col items-center justify-center p-6 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
+                  <img src={qrCodeUrl} alt="Menu QR Code" className="w-40 h-40 bg-white p-2 rounded-lg shadow-sm mb-3" />
+                  <p className="text-xs text-gray-500 font-medium">Scan code to test menu</p>
+              </div>
+          </div>
       </div>
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

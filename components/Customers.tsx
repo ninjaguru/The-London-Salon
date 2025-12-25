@@ -275,14 +275,21 @@ const Customers: React.FC = () => {
           const text = event.target?.result as string;
           if (!text) return;
 
-          const lines = text.split(/\r\n|\n/);
+          const lines = text.split(/\r\n|\n/).filter(line => line.trim() !== '');
           if (lines.length < 2) {
               alert('File appears to be empty or missing headers.');
               return;
           }
 
+          // Robust CSV Splitter handling quoted commas
+          const parseLine = (line: string) => {
+              // Regex to split by comma ONLY if not inside quotes
+              const regex = /,(?=(?:(?:[^"]*"){2})*[^"]*$)/; 
+              return line.split(regex).map(s => s.trim().replace(/^"|"$/g, ''));
+          };
+
           // Headers check
-          const headers = lines[0].toLowerCase().split(',');
+          const headers = parseLine(lines[0].toLowerCase());
           const nameIndex = headers.findIndex(h => h.includes('name'));
           const phoneIndex = headers.findIndex(h => h.includes('phone') || h.includes('mobile'));
 
@@ -292,28 +299,30 @@ const Customers: React.FC = () => {
           }
 
           const newCustomers: Customer[] = [];
-          const existingPhones = new Set(customers.map(c => c.phone));
-          const existingNames = new Set(customers.map(c => c.name.toLowerCase()));
-
+          // Ensure phone is treated as string for existing check
+          const existingPhones = new Set(customers.map(c => String(c.phone || '').replace(/\s+/g, '')));
+          
           let addedCount = 0;
-          let skippedCount = 0;
+          let duplicatesCount = 0;
+          let invalidCount = 0;
 
           for (let i = 1; i < lines.length; i++) {
-              const line = lines[i].trim();
+              const line = lines[i];
               if (!line) continue;
               
-              // Handle CSV Split (Basic split, ignoring advanced quote handling for simplicity based on expected input)
-              const cols = line.split(','); 
-              const rawName = cols[nameIndex]?.trim().replace(/^"|"$/g, '');
-              const rawPhone = cols[phoneIndex]?.trim().replace(/^"|"$/g, '');
+              const cols = parseLine(line);
+              const rawName = cols[nameIndex];
+              const rawPhone = cols[phoneIndex];
 
               if (rawName && rawPhone) {
+                  const cleanPhone = String(rawPhone).replace(/\s+/g, '');
+                  
                   // Basic deduplication
-                  if (!existingPhones.has(rawPhone)) {
+                  if (!existingPhones.has(cleanPhone)) {
                       newCustomers.push({
                           id: crypto.randomUUID(),
                           name: rawName,
-                          phone: rawPhone,
+                          phone: rawPhone, // Keep original format for display
                           email: '',
                           apartment: '',
                           birthday: '',
@@ -323,11 +332,13 @@ const Customers: React.FC = () => {
                           isMember: false,
                           activeCoupons: []
                       });
-                      existingPhones.add(rawPhone);
+                      existingPhones.add(cleanPhone); // Add to set to catch duplicates within the file too
                       addedCount++;
                   } else {
-                      skippedCount++;
+                      duplicatesCount++;
                   }
+              } else {
+                  invalidCount++;
               }
           }
 
@@ -335,9 +346,9 @@ const Customers: React.FC = () => {
               const updated = [...customers, ...newCustomers];
               setCustomers(updated);
               db.customers.save(updated);
-              alert(`Import Successful!\nAdded: ${addedCount}\nSkipped (Duplicates): ${skippedCount}`);
+              alert(`Import Complete!\n\nAdded: ${addedCount}\nSkipped (Duplicates): ${duplicatesCount}\nSkipped (Invalid/Empty): ${invalidCount}\n\nNote: Duplicate phone numbers are automatically skipped.`);
           } else {
-              alert('No new customers found. All phone numbers might be duplicates.');
+              alert(`Import Complete.\n\nNo new customers added.\nSkipped (Duplicates): ${duplicatesCount}\nSkipped (Invalid): ${invalidCount}`);
           }
           
           // Reset
@@ -348,9 +359,9 @@ const Customers: React.FC = () => {
 
   // --- Filtering & Pagination ---
   const filteredCustomers = customers.filter(c => 
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    c.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.phone.includes(searchTerm)
+    (c.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+    (c.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    String(c.phone || '').includes(searchTerm)
   );
 
   // Pagination Logic (Client Side for now since we loaded all)
