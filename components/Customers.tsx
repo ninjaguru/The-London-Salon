@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db, exportToCSV, getTodayIST } from '../services/db';
 import { authService } from '../services/auth';
 import { Customer, Package, Sale, CouponTemplate, CustomerCoupon } from '../types';
-import { Plus, Search, Mail, Phone, User, Download, Home, Cake, Heart, Wallet, CreditCard, Gift, Clock, AlertCircle, Crown, History, TicketPercent, CheckCircle, Star, Upload } from 'lucide-react';
+import { Plus, Search, Mail, Phone, User, Download, Home, Cake, Heart, Wallet, CreditCard, Gift, Clock, AlertCircle, Crown, History, TicketPercent, CheckCircle, Star, Upload, MessageCircle } from 'lucide-react';
 import Modal from './ui/Modal';
 
 const Customers: React.FC = () => {
@@ -488,8 +488,8 @@ const Customers: React.FC = () => {
                     <button
                         onClick={() => setActiveTab('all')}
                         className={`${activeTab === 'all'
-                                ? 'border-rose-500 text-rose-600'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                            ? 'border-rose-500 text-rose-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                             } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
                     >
                         All Clients
@@ -497,8 +497,8 @@ const Customers: React.FC = () => {
                     <button
                         onClick={() => setActiveTab('upcoming')}
                         className={`${activeTab === 'upcoming'
-                                ? 'border-rose-500 text-rose-600'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                            ? 'border-rose-500 text-rose-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                             } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center`}
                     >
                         <Gift size={16} className="mr-2" /> Upcoming Events
@@ -605,8 +605,22 @@ const Customers: React.FC = () => {
                                     )}
 
                                     <div className="space-y-2 mt-auto">
-                                        <div className="flex items-center text-gray-600 text-sm">
-                                            <Phone size={16} className="mr-2 text-gray-400" /> {customer.phone}
+                                        <div className="flex items-center justify-between text-gray-600 text-sm">
+                                            <div className="flex items-center">
+                                                <Phone size={16} className="mr-2 text-gray-400" /> {customer.phone}
+                                            </div>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    const cleanPhone = customer.phone.replace(/\D/g, '');
+                                                    const phoneWithCountry = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+                                                    window.open(`https://web.whatsapp.com/send?phone=${phoneWithCountry}`, 'whatsapp_tab');
+                                                }}
+                                                className="p-1.5 bg-green-50 text-green-600 rounded-md hover:bg-green-100 border border-green-100 transition-colors"
+                                                title="WhatsApp Chat"
+                                            >
+                                                <MessageCircle size={16} />
+                                            </button>
                                         </div>
                                         {customer.apartment && (
                                             <div className="flex items-center text-gray-600 text-sm">
@@ -687,9 +701,20 @@ const Customers: React.FC = () => {
                                     </div>
                                     <div>
                                         <p className="font-bold text-gray-900">{customer.name}</p>
-                                        <div className="text-sm text-gray-500 flex gap-4">
+                                        <div className="text-sm text-gray-500 flex items-center gap-4">
                                             <span className="flex items-center"><Phone size={12} className="mr-1" /> {customer.phone}</span>
                                             {customer.apartment && <span className="flex items-center"><Home size={12} className="mr-1" /> {customer.apartment}</span>}
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    const cleanPhone = customer.phone.replace(/\D/g, '');
+                                                    const phoneWithCountry = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+                                                    window.open(`https://web.whatsapp.com/send?phone=${phoneWithCountry}`, 'whatsapp_tab');
+                                                }}
+                                                className="text-green-600 hover:text-green-700 flex items-center gap-1 font-medium"
+                                            >
+                                                <MessageCircle size={12} /> Chat
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
