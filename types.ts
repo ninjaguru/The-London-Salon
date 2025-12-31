@@ -90,16 +90,16 @@ export interface Customer {
   apartment: string;
   birthday: string;
   anniversary: string;
-  
+
   // Wallet Packages
   packageId?: string; // Link to the specific wallet plan/package
-  
+
   // Yearly Membership
   isMember: boolean; // Paid 200rs yearly membership
   membershipExpiry?: string; // ISO Date string for yearly membership
 
   membershipRenewalDate?: string; // ISO Date string for Wallet Package Expiry (Legacy name kept for compatibility or refactored)
-  
+
   walletBalance: number; // Current credit balance
   joinDate: string;
   notes?: string;
@@ -148,6 +148,7 @@ export interface Package {
   description: string;
   complimentaryServices: string[]; // List of free services
   validityMonths: number; // Duration in months
+  gender: GenderTarget;
 }
 
 export type NotificationType = 'reminder' | 'alert' | 'info' | 'staff';
