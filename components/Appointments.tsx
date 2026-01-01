@@ -15,6 +15,7 @@ const Appointments: React.FC = () => {
     const [categories, setCategories] = useState<Category[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+    const [displayedAppointments, setDisplayedAppointments] = useState<Appointment[]>([]);
 
     // Type Ahead State
     const [customerSearch, setCustomerSearch] = useState('');
@@ -53,7 +54,32 @@ const Appointments: React.FC = () => {
     // Payment Modal State
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
     const [pendingBillData, setPendingBillData] = useState<{ customer: Customer, appointments: Appointment[] } | null>(null);
-    const [paymentMode, setPaymentMode] = useState<'Cash' | 'Card' | 'UPI'>('Cash');
+    const [paymentMode, setPaymentMode] = useState<'Cash' | 'Card' | 'UPI' | 'Wallet'>('Cash');
+
+    // IST Date Helper
+    const formatDateIST = (dateStr: string) => {
+        if (!dateStr) return '';
+        // Input is YYYY-MM-DD
+        const [y, m, d] = dateStr.split('-').map(Number);
+        const date = new Date(y, m - 1, d);
+        return date.toLocaleDateString('en-IN', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        });
+    };
+
+    const handleSearch = () => {
+        const results = appointments.filter(appt => {
+            const matchesStaff = filterStaff ? appt.staffId === filterStaff : true;
+            const matchesStartDate = filterStartDate ? appt.date >= filterStartDate : true;
+            const matchesEndDate = filterEndDate ? appt.date <= filterEndDate : true;
+            const matchesStatus = filterStatus ? appt.status === filterStatus : true;
+            return matchesStaff && matchesStartDate && matchesEndDate && matchesStatus;
+        });
+        setDisplayedAppointments(results);
+    };
 
     useEffect(() => {
         setAppointments(db.appointments.getAll());
@@ -67,6 +93,8 @@ const Appointments: React.FC = () => {
     const handleStatusChange = (id: string, newStatus: AppointmentStatus) => {
         const updated = appointments.map(a => a.id === id ? { ...a, status: newStatus } : a);
         setAppointments(updated);
+        // Also update displayed list if it exists
+        setDisplayedAppointments(prev => prev.map(a => a.id === id ? { ...a, status: newStatus } : a));
         db.appointments.save(updated);
     };
 
@@ -224,6 +252,25 @@ const Appointments: React.FC = () => {
     const confirmBillGeneration = async (generatePdf: boolean) => {
         if (!pendingBillData) return;
 
+        const totalToBill = pendingBillData.appointments
+            .filter(a => a.status !== AppointmentStatus.Cancelled)
+            .reduce((acc, curr) => acc + curr.price, 0);
+
+        // Wallet Logic
+        if (paymentMode === 'Wallet') {
+            const customer = customers.find(c => c.id === pendingBillData.customer.id);
+            if (!customer || customer.walletBalance < totalToBill) {
+                alert(`Insufficient wallet balance. Available: ₹${customer?.walletBalance || 0}`);
+                return;
+            }
+
+            // Deduct from wallet
+            const updatedCustomer = { ...customer, walletBalance: customer.walletBalance - totalToBill };
+            const updatedCustomers = customers.map(c => c.id === customer.id ? updatedCustomer : c);
+            setCustomers(updatedCustomers);
+            db.customers.save(updatedCustomers);
+        }
+
         // 1. Update Appointments with Payment Mode and Status
         const appointmentIdsToUpdate = new Set(pendingBillData.appointments.map(a => a.id));
         const updatedAppointments = appointments.map(appt => {
@@ -238,6 +285,7 @@ const Appointments: React.FC = () => {
         });
 
         setAppointments(updatedAppointments);
+        setDisplayedAppointments(prev => prev.map(a => appointmentIdsToUpdate.has(a.id) ? { ...a, paymentMethod: paymentMode as any, status: AppointmentStatus.Completed } : a));
         db.appointments.save(updatedAppointments);
 
         // 2. Generate PDF if requested
@@ -344,7 +392,10 @@ const Appointments: React.FC = () => {
 
         items.forEach((item) => {
             const staffMember = staff.find(s => s.id === item.staffId)?.name || 'N/A';
-            doc.text(new Date(item.date).toLocaleDateString(), 25, yOffset);
+            // Fix: avoid UTC shift in PDF
+            const [y, m, d] = item.date.split('-').map(Number);
+            const itemDateLocal = new Date(y, m - 1, d);
+            doc.text(itemDateLocal.toLocaleDateString('en-IN'), 25, yOffset);
             doc.text(String(item.serviceName), 55, yOffset);
             doc.text(staffMember, 120, yOffset);
             doc.text(`Rs. ${item.price.toFixed(2)}`, pageWidth - 25, yOffset, { align: 'right' });
@@ -379,20 +430,12 @@ const Appointments: React.FC = () => {
 
     // --- Render & Filter Logic ---
 
-    const filteredAppointments = appointments.filter(appt => {
-        const matchesStaff = filterStaff ? appt.staffId === filterStaff : true;
-        const matchesStartDate = filterStartDate ? appt.date >= filterStartDate : true;
-        const matchesEndDate = filterEndDate ? appt.date <= filterEndDate : true;
-        const matchesStatus = filterStatus ? appt.status === filterStatus : true;
-        return matchesStaff && matchesStartDate && matchesEndDate && matchesStatus;
-    });
-
     const getStaffName = (id: string) => staff.find(s => s.id === id)?.name || 'Unknown';
     const getCustomerName = (id: string) => customers.find(c => c.id === id)?.name || 'Unknown';
 
-    // Group by Customer for Card View
+    // Group by Customer for Card View (from displayedAppointments)
     const appointmentsByCustomer: Record<string, Appointment[]> = {};
-    filteredAppointments.forEach(appt => {
+    displayedAppointments.forEach(appt => {
         if (!appointmentsByCustomer[appt.customerId]) {
             appointmentsByCustomer[appt.customerId] = [];
         }
@@ -442,8 +485,8 @@ const Appointments: React.FC = () => {
                                 key={appt.id}
                                 title={`${appt.time} - ${appt.serviceName} (${getCustomerName(appt.customerId)})`}
                                 className={`text-[10px] px-1.5 py-0.5 rounded border truncate cursor-pointer ${appt.status === 'Completed' ? 'bg-green-100 text-green-800 border-green-200' :
-                                        appt.status === 'Cancelled' ? 'bg-red-50 text-red-800 border-red-100' :
-                                            'bg-blue-100 text-blue-800 border-blue-200'
+                                    appt.status === 'Cancelled' ? 'bg-red-50 text-red-800 border-red-100' :
+                                        'bg-blue-100 text-blue-800 border-blue-200'
                                     }`}
                             >
                                 {appt.time} {getCustomerName(appt.customerId).split(' ')[0]}
@@ -486,7 +529,7 @@ const Appointments: React.FC = () => {
                     </div>
 
                     <button
-                        onClick={() => exportToCSV(filteredAppointments, 'appointments')}
+                        onClick={() => exportToCSV(displayedAppointments, 'appointments')}
                         className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm"
                     >
                         <Download className="w-4 h-4 mr-2" /> Export
@@ -544,12 +587,21 @@ const Appointments: React.FC = () => {
                                 className="border border-gray-300 rounded-md px-3 py-1.5 text-sm"
                             />
                         </div>
-                        <button
-                            onClick={clearFilters}
-                            className="text-sm text-gray-500 hover:text-rose-600 flex items-center pb-2"
-                        >
-                            <X size={14} className="mr-1" /> Clear
-                        </button>
+
+                        <div className="flex gap-2">
+                            <button
+                                onClick={handleSearch}
+                                className="bg-rose-600 text-white px-4 py-1.5 rounded-md text-sm font-medium hover:bg-rose-700 flex items-center transition-colors shadow-sm"
+                            >
+                                <Search size={16} className="mr-2" /> Search
+                            </button>
+                            <button
+                                onClick={clearFilters}
+                                className="text-sm text-gray-500 hover:text-rose-600 flex items-center py-1.5"
+                            >
+                                <X size={14} className="mr-1" /> Clear
+                            </button>
+                        </div>
                     </div>
 
                     {/* List View - Grouped Cards */}
@@ -589,7 +641,7 @@ const Appointments: React.FC = () => {
                                                     <div className="flex justify-between items-center mb-2 pb-2 border-b border-gray-50">
                                                         <h4 className="text-xs font-semibold text-gray-500 flex items-center">
                                                             <CalendarIcon size={12} className="mr-1" />
-                                                            {new Date(date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                                                            {formatDateIST(date)}
                                                         </h4>
 
                                                         {/* Bill Button for Completed Appointments */}
@@ -624,8 +676,8 @@ const Appointments: React.FC = () => {
                                                                         value={appt.status}
                                                                         onChange={(e) => handleStatusChange(appt.id, e.target.value as AppointmentStatus)}
                                                                         className={`text-xs font-medium rounded-full px-2 py-1 border border-transparent focus:outline-none focus:ring-2 focus:ring-offset-1 ${appt.status === AppointmentStatus.Scheduled ? 'bg-blue-100 text-blue-800 focus:ring-blue-500' :
-                                                                                appt.status === AppointmentStatus.Completed ? 'bg-green-100 text-green-800 focus:ring-green-500' :
-                                                                                    'bg-red-100 text-red-800 focus:ring-red-500'
+                                                                            appt.status === AppointmentStatus.Completed ? 'bg-green-100 text-green-800 focus:ring-green-500' :
+                                                                                'bg-red-100 text-red-800 focus:ring-red-500'
                                                                             }`}
                                                                     >
                                                                         {Object.values(AppointmentStatus).map(s => <option key={s} value={s}>{s}</option>)}
@@ -913,20 +965,34 @@ const Appointments: React.FC = () => {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
-                        <div className="grid grid-cols-3 gap-3">
-                            {['Cash', 'Card', 'UPI'].map(mode => (
-                                <button
-                                    key={mode}
-                                    onClick={() => setPaymentMode(mode as any)}
-                                    className={`py-2 px-4 rounded-md border text-sm font-medium transition-colors ${paymentMode === mode
+                        <div className="flex justify-between items-center mb-2">
+                            <label className="block text-sm font-medium text-gray-700">Payment Method</label>
+                            {pendingBillData?.customer.walletBalance! > 0 && (
+                                <span className="text-xs font-bold text-green-600">
+                                    Wallet Balance: ₹{pendingBillData?.customer.walletBalance}
+                                </span>
+                            )}
+                        </div>
+                        <div className="grid grid-cols-4 gap-3">
+                            {['Cash', 'Card', 'UPI', 'Wallet'].map(mode => {
+                                const isWallet = mode === 'Wallet';
+                                const hasBalance = (pendingBillData?.customer.walletBalance || 0) > 0;
+
+                                if (isWallet && !hasBalance) return null;
+
+                                return (
+                                    <button
+                                        key={mode}
+                                        onClick={() => setPaymentMode(mode as any)}
+                                        className={`py-2 px-4 rounded-md border text-sm font-medium transition-colors ${paymentMode === mode
                                             ? 'bg-rose-50 border-rose-500 text-rose-700'
                                             : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-                                        }`}
-                                >
-                                    {mode}
-                                </button>
-                            ))}
+                                            }`}
+                                    >
+                                        {mode}
+                                    </button>
+                                );
+                            })}
                         </div>
                     </div>
 

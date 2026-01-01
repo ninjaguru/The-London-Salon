@@ -130,6 +130,7 @@ export interface Sale {
   id: string;
   date: string;
   customerId: string | null; // Can be guest
+  staffId?: string; // Links to Staff ID
   items: Array<{
     name: string;
     price: number;
@@ -137,7 +138,7 @@ export interface Sale {
     type: 'Service' | 'Product' | 'Package' | 'Combo' | 'Membership';
   }>;
   total: number;
-  paymentMethod: 'Cash' | 'Card' | 'Wallet';
+  paymentMethod: 'Cash' | 'Card' | 'UPI' | 'Wallet';
 }
 
 export interface Package {
