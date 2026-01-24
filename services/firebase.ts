@@ -16,23 +16,33 @@ const STORAGE_KEY_CONFIG = 'salon_firebase_config';
 
 export const firebaseService = {
     getConfig: (): FirebaseConfig | null => {
-        // First check environment variables (ideal for Vercel/Production)
-        if (import.meta.env.VITE_FIREBASE_API_KEY) {
-            return {
-                apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-                authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-                projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-                storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-                messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-                appId: import.meta.env.VITE_FIREBASE_APP_ID
-            };
-        }
+        const isPlaceholder = (val?: string) => !val || val.includes('YOUR_') || val === 'undefined';
 
-        // Fallback to local storage
+        // Check environment variables first
+        try {
+            const envKey = import.meta.env.VITE_FIREBASE_API_KEY;
+            if (!isPlaceholder(envKey)) {
+                return {
+                    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+                    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+                    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+                    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+                    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+                    appId: import.meta.env.VITE_FIREBASE_APP_ID
+                };
+            }
+        } catch (e) { }
+
+        // Fallback to local storage (Manual Config via UI)
         try {
             const stored = localStorage.getItem(STORAGE_KEY_CONFIG);
-            return stored ? JSON.parse(stored) : null;
-        } catch (e) { return null; }
+            if (stored) {
+                const config = JSON.parse(stored);
+                if (!isPlaceholder(config.apiKey)) return config;
+            }
+        } catch (e) { }
+
+        return null;
     },
 
     setConfig: (config: FirebaseConfig) => {
