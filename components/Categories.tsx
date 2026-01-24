@@ -10,7 +10,7 @@ const Categories: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  
+
   const user = authService.getCurrentUser();
   const isAdmin = user?.role === 'Admin';
 
@@ -41,7 +41,7 @@ const Categories: React.FC = () => {
 
   const handleDelete = (id: string) => {
     if (!isAdmin) return;
-    if (confirm('Are you sure you want to delete this category?')) {
+    if (window.confirm('Are you sure you want to delete this category?')) {
       const newList = categories.filter(c => c.id !== id);
       setCategories(newList);
       db.categories.save(newList);
@@ -71,18 +71,18 @@ const Categories: React.FC = () => {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800">Category Management</h2>
         <div className="flex gap-2">
-            <button 
-                onClick={() => exportToCSV(categories, 'categories')}
-                className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm"
-            >
-                <Download className="w-4 h-4 mr-2" /> Export
-            </button>
-            <button 
+          <button
+            onClick={() => exportToCSV(categories, 'categories')}
+            className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm"
+          >
+            <Download className="w-4 h-4 mr-2" /> Export
+          </button>
+          <button
             onClick={() => openModal()}
             className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
-            >
+          >
             <Plus size={18} /> Add Category
-            </button>
+          </button>
         </div>
       </div>
 
@@ -99,7 +99,7 @@ const Categories: React.FC = () => {
             {categories.map((category) => (
               <tr key={category.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="font-medium text-gray-900">{category.name}</span>
+                  <span className="font-medium text-gray-900">{category.name}</span>
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-500">
                   {category.description}
@@ -113,9 +113,9 @@ const Categories: React.FC = () => {
               </tr>
             ))}
             {categories.length === 0 && (
-                <tr>
-                    <td colSpan={3} className="px-6 py-4 text-center text-gray-500">No categories found.</td>
-                </tr>
+              <tr>
+                <td colSpan={3} className="px-6 py-4 text-center text-gray-500">No categories found.</td>
+              </tr>
             )}
           </tbody>
         </table>
@@ -125,18 +125,18 @@ const Categories: React.FC = () => {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">Category Name</label>
-            <input 
-              type="text" 
-              required 
-              value={name} 
+            <input
+              type="text"
+              required
+              value={name}
               onChange={e => setName(e.target.value)}
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-rose-500 focus:ring-rose-500 sm:text-sm border p-2"
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Description</label>
-            <textarea 
-              value={description} 
+            <textarea
+              value={description}
               onChange={e => setDescription(e.target.value)}
               rows={3}
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-rose-500 focus:ring-rose-500 sm:text-sm border p-2"

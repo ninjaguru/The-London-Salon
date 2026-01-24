@@ -29,14 +29,14 @@ const Login: React.FC = () => {
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="text-center">
-            <img 
-              src="/logo.png?v=2" 
-              alt="The London Salon" 
-              className="mx-auto h-32 w-auto mb-6 object-contain"
-            />
-            <h2 className="mt-2 text-center text-sm text-gray-600">
-                Sign in to your account
-            </h2>
+          <img
+            src="/logo.png?v=2"
+            alt="The London Salon"
+            className="mx-auto h-32 w-auto mb-6 object-contain"
+          />
+          <h2 className="mt-2 text-center text-sm text-gray-600">
+            Sign in to your account
+          </h2>
         </div>
       </div>
 

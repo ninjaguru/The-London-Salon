@@ -3,7 +3,8 @@ import {
   Staff, Product, Customer, Appointment, Sale, Package, Notification, Category, Service, Lead, CouponTemplate, Combo,
   Role, AppointmentStatus
 } from '../types';
-import { sheetsService } from './sheets';
+import { firebaseService, getFirebaseDb } from './firebase';
+import { doc, setDoc, getDocs, collection, onSnapshot } from 'firebase/firestore';
 
 // Helper: Get Current Date in IST (YYYY-MM-DD)
 export const getTodayIST = (): string => {
@@ -67,10 +68,26 @@ class StorageService<T> {
   save(data: T[]) {
     try {
       localStorage.setItem(this.key, JSON.stringify(data));
-      // Trigger background sync to sheets if configured
-      if (sheetsService.isConfigured()) {
-        sheetsService.write(this.tableName, data).then(() => console.log(`Synced ${this.tableName}`));
+
+
+      // Trigger background sync to Firebase if configured
+      if (firebaseService.isConfigured()) {
+        const firestore = getFirebaseDb();
+        if (firestore) {
+          let userName = 'Cloud-Sync';
+          try {
+            const userJson = localStorage.getItem('salon_auth_user');
+            if (userJson) userName = JSON.parse(userJson).name;
+          } catch (e) { }
+
+          setDoc(doc(firestore, 'salon_vault', this.tableName), {
+            data,
+            updatedAt: new Date().toISOString(),
+            updatedBy: userName
+          }).then(() => console.log(`Synced ${this.tableName} to Firebase`));
+        }
       }
+
       // Dispatch event for UI reactivity
       window.dispatchEvent(new Event('db-updated'));
     } catch (e) {
@@ -152,87 +169,61 @@ export const exportToCSV = (data: any[], filename: string) => {
   }
 };
 
-// Sync Logic
+// Cloud sync Logic
 export const syncFromCloud = async () => {
-  if (!sheetsService.isConfigured()) return { success: false, message: 'Cloud not configured' };
+  // If Firebase is configured, it handles real-time sync, but we can do a one-time push/pull here
+  if (firebaseService.isConfigured()) {
+    const firestore = getFirebaseDb();
+    if (!firestore) return { success: false, message: 'Firebase not initialized' };
 
-  try {
-    const response = await sheetsService.readAll();
-    if (response.status === 'success' && response.data) {
-      const cloudData = response.data;
+    try {
+      const querySnapshot = await getDocs(collection(firestore, 'salon_vault'));
+      querySnapshot.forEach((doc) => {
+        const tableName = doc.id;
+        const cloudData = doc.data().data;
 
-      // Override local stores with cloud data
-      if (cloudData['Staff']) db.staff.overrideLocal(cloudData['Staff']);
-      if (cloudData['Categories']) db.categories.overrideLocal(cloudData['Categories']);
-      if (cloudData['Services']) db.services.overrideLocal(cloudData['Services']);
-      if (cloudData['Combos']) db.combos.overrideLocal(cloudData['Combos']);
-      if (cloudData['Inventory']) db.inventory.overrideLocal(cloudData['Inventory']);
-      if (cloudData['Packages']) db.packages.overrideLocal(cloudData['Packages']);
-      if (cloudData['Leads']) db.leads.overrideLocal(cloudData['Leads']);
-      if (cloudData['Sales']) db.sales.overrideLocal(cloudData['Sales']);
-      if (cloudData['CouponTemplates']) db.couponTemplates.overrideLocal(cloudData['CouponTemplates']);
-
-      // Helper to get YYYY-MM-DD in IST from any date input
-      const toISTDate = (val: any) => {
-        if (!val) return '';
-        const d = new Date(val);
-        if (isNaN(d.getTime())) return val;
-        return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
-      };
-
-      // Helper to get HH:mm in IST from any date input
-      const toISTTime = (val: any) => {
-        if (!val) return '';
-        const d = new Date(val);
-        if (isNaN(d.getTime())) return val;
-        return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' });
-      };
-
-      // Special handling for Customers and Appointments to sanitize Dates
-      if (cloudData['Customers']) {
-        const cleanCustomers = cloudData['Customers'].map((c: any) => {
-          let parsedCoupons = [];
-          try {
-            if (typeof c.activeCoupons === 'string') {
-              parsedCoupons = JSON.parse(c.activeCoupons);
-            } else if (Array.isArray(c.activeCoupons)) {
-              parsedCoupons = c.activeCoupons;
-            }
-          } catch (e) {
-            parsedCoupons = [];
-          }
-
-          return {
-            ...c,
-            // Ensure dates are YYYY-MM-DD in IST
-            birthday: toISTDate(c.birthday),
-            anniversary: toISTDate(c.anniversary),
-            // Ensure activeCoupons is always an array
-            activeCoupons: parsedCoupons || []
-          };
-        });
-        db.customers.overrideLocal(cleanCustomers);
-      }
-
-      if (cloudData['Appointments']) {
-        const cleanAppts = cloudData['Appointments'].map((a: any) => ({
-          ...a,
-          // Ensure date is YYYY-MM-DD in IST
-          date: toISTDate(a.date),
-          // Ensure time is HH:MM in IST
-          time: a.time && a.time.toString().includes('T') ? toISTTime(a.time) : a.time
-        }));
-        db.appointments.overrideLocal(cleanAppts);
-      }
-
-      return { success: true, message: 'Data synchronized from cloud.' };
-    } else {
-      return { success: false, message: response.message || 'Sync failed' };
+        // Map Firebase collection names to our db keys
+        const dbKey = Object.keys(db).find(key => (db as any)[key].tableName === tableName);
+        if (dbKey && cloudData) {
+          (db as any)[dbKey].overrideLocal(cloudData);
+        }
+      });
+      return { success: true, message: 'Data synchronized from Firebase.' };
+    } catch (e) {
+      console.error('Firebase Sync Error:', e);
+      return { success: false, message: 'Firebase sync failed.' };
     }
-  } catch (e) {
-    console.error(e);
-    return { success: false, message: 'Network error during sync' };
   }
+  return { success: false, message: 'Cloud integration (Sheets/Firebase) not configured.' };
+};
+
+// Real-time Listener Setup
+export const setupRealtimeSync = () => {
+  if (!firebaseService.isConfigured()) return null;
+
+  const firestore = getFirebaseDb();
+  if (!firestore) return null;
+
+  return onSnapshot(collection(firestore, 'salon_vault'), (snapshot) => {
+    snapshot.docChanges().forEach((change) => {
+      if (change.type === 'added' || change.type === 'modified') {
+        const tableName = change.doc.id;
+        const cloudData = change.doc.data().data;
+        const updatedAt = change.doc.data().updatedAt;
+
+        // Only override if cloud is newer or different
+        const dbKey = Object.keys(db).find(key => (db as any)[key].tableName === tableName);
+        if (dbKey && cloudData) {
+          const store = (db as any)[dbKey];
+          const localData = store.getAll();
+          if (JSON.stringify(localData) !== JSON.stringify(cloudData)) {
+            console.log(`Real-time update for ${tableName}`);
+            store.overrideLocal(cloudData);
+          }
+        }
+      }
+    });
+  });
 };
 
 // Helper for local pagination (if needed)

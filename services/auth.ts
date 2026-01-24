@@ -1,36 +1,39 @@
-
+import { signInWithEmailAndPassword, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { getFirebaseAuth } from './firebase';
 import { User } from '../types';
 
-const USERS: User[] = [
-    { username: 'ninja', name: 'System Admin', role: 'Admin' },
-    { username: 'manager', name: 'Salon Manager', role: 'Manager' }
-];
-
 const AUTH_KEY = 'salon_auth_user';
+const USERS_COLLECTION = 'users'; // We'll store user profile info here
 
 export const authService = {
-    login: (username: string, password: string): Promise<User | null> => {
-        return new Promise((resolve) => {
-            // Simulated delay
-            setTimeout(() => {
-                // Hardcoded credentials
-                if (username === 'ninja' && password === 'Q1p0w2o9#$') {
-                    const user = USERS[0];
-                    try { localStorage.setItem(AUTH_KEY, JSON.stringify(user)); } catch(e){}
-                    resolve(user);
-                } else if (username === 'manager' && password === 'TlsManage#$') {
-                    const user = USERS[1];
-                    try { localStorage.setItem(AUTH_KEY, JSON.stringify(user)); } catch(e){}
-                    resolve(user);
-                } else {
-                    resolve(null);
-                }
-            }, 500);
-        });
+    login: async (email: string, password: string): Promise<User | null> => {
+        const auth = getFirebaseAuth();
+        if (!auth) throw new Error('Firebase not configured');
+
+        try {
+            const userCredential = await signInWithEmailAndPassword(auth, email, password);
+            const fbUser = userCredential.user;
+
+            // For now, we'll map common roles based on name or metadata, 
+            // In a real app, you'd fetch this from a 'users' collection in Firestore.
+            const user: User = {
+                username: fbUser.email || 'user',
+                name: fbUser.displayName || fbUser.email?.split('@')[0] || 'Staff',
+                role: (fbUser.email === 'admin@thelondonsalon.com' || fbUser.email === 'ninjaproctor@gmail.com') ? 'Admin' : 'Manager' // Logic for roles
+            };
+
+            localStorage.setItem(AUTH_KEY, JSON.stringify(user));
+            return user;
+        } catch (error: any) {
+            console.error('Firebase Login Error:', error);
+            throw error;
+        }
     },
 
-    logout: () => {
-        try { localStorage.removeItem(AUTH_KEY); } catch(e){}
+    logout: async () => {
+        const auth = getFirebaseAuth();
+        if (auth) await signOut(auth);
+        localStorage.removeItem(AUTH_KEY);
     },
 
     getCurrentUser: (): User | null => {

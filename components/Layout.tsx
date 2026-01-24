@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  Users, 
-  Scissors, 
-  Calendar, 
-  ShoppingBag, 
-  CreditCard, 
-  Sparkles, 
+import {
+  LayoutDashboard,
+  Users,
+  Scissors,
+  Calendar,
+  ShoppingBag,
+  CreditCard,
+  Sparkles,
   Menu,
   X,
   Crown,
@@ -19,14 +19,13 @@ import {
   Target,
   MapPin,
   Settings,
-  Cloud,
-  FileSpreadsheet,
   TicketPercent,
-  Layers
+  Layers,
+  Flame
 } from 'lucide-react';
-import { db, createNotification, syncFromCloud } from '../services/db';
+import { db, createNotification, syncFromCloud, setupRealtimeSync } from '../services/db';
 import { authService } from '../services/auth';
-import { sheetsService } from '../services/sheets';
+import { firebaseService } from '../services/firebase';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -36,18 +35,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [user, setUser] = useState(authService.getCurrentUser());
-  const [isCloudConfigured, setIsCloudConfigured] = useState(false);
-  const [sheetViewUrl, setSheetViewUrl] = useState('');
-  
+  const [isFirebaseConfigured, setIsFirebaseConfigured] = useState(false);
+
   // Loading State
   const [isGlobalSyncing, setIsGlobalSyncing] = useState(false);
 
   // Clock State
   const [currentTime, setCurrentTime] = useState(new Date());
-  
+
   // Ref to track if we have already synced this session to prevent re-sync on navigation
   const hasSynced = useRef(false);
-  
+
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -85,22 +83,34 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   useEffect(() => {
     // Only sync if user is logged in, we haven't synced this session, and we are not on login page
     if (user && !hasSynced.current && location.pathname !== '/login') {
-       hasSynced.current = true; // Mark as synced immediately
-       setIsGlobalSyncing(true);
-       
-       // Perform a background sync to get latest data from sheets
-       syncFromCloud().then(res => {
-         if (res.success) {
-           console.log('Auto-sync successful');
-         } else {
-           console.warn('Auto-sync failed:', res.message);
-         }
-       }).finally(() => {
-         // Add a small delay for better UX so it doesn't flash too fast
-         setTimeout(() => setIsGlobalSyncing(false), 500);
-       });
+      hasSynced.current = true; // Mark as synced immediately
+      setIsGlobalSyncing(true);
+
+      // Perform a background sync to check connection
+      syncFromCloud().then(res => {
+        if (res.success) {
+          console.log('Auto-sync successful');
+        } else {
+          console.warn('Auto-sync failed:', res.message);
+        }
+      }).finally(() => {
+        // Add a small delay for better UX so it doesn't flash too fast
+        setTimeout(() => setIsGlobalSyncing(false), 500);
+      });
     }
-  }, [user]); 
+  }, [user]);
+
+  // Real-time Sync Effect
+  useEffect(() => {
+    let unsubscribe: any = null;
+    if (user && firebaseService.isConfigured()) {
+      unsubscribe = setupRealtimeSync();
+      console.log('Firebase real-time sync active');
+    }
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [user]);
 
   // Check for notifications periodically and update user state
   useEffect(() => {
@@ -108,11 +118,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     const currentUser = authService.getCurrentUser();
     // Only update state if user object actually changed to prevent firing other effects
     if (JSON.stringify(currentUser) !== JSON.stringify(user)) {
-        setUser(currentUser);
+      setUser(currentUser);
     }
-    
-    setIsCloudConfigured(sheetsService.isConfigured());
-    setSheetViewUrl(sheetsService.getViewUrl());
+
+    setIsFirebaseConfigured(firebaseService.isConfigured());
 
     // Skip notification/system checks if on login page
     if (location.pathname === '/login') return;
@@ -130,12 +139,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       // Check Inventory
       products.forEach(p => {
         if (p.quantity <= p.minThreshold) {
-           const alreadyNotified = existingNotifs.some(n => 
-             n.type === 'alert' && n.relatedId === p.id && !n.read
-           );
-           if (!alreadyNotified) {
-             createNotification('alert', 'Low Stock Alert', `${p.name} is running low (${p.quantity} left).`, p.id);
-           }
+          const alreadyNotified = existingNotifs.some(n =>
+            n.type === 'alert' && n.relatedId === p.id && !n.read
+          );
+          if (!alreadyNotified) {
+            createNotification('alert', 'Low Stock Alert', `${p.name} is running low (${p.quantity} left).`, p.id);
+          }
         }
       });
 
@@ -147,34 +156,34 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         const today = new Date();
         const diffTime = renewal.getTime() - today.getTime();
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        
+
         if (diffDays <= 7 && diffDays >= 0) {
-           const alreadyNotified = existingNotifs.some(n => 
-             n.type === 'info' && n.relatedId === c.id && n.title.includes('Membership')
-           );
-           if (!alreadyNotified) {
-             createNotification('info', 'Membership Expiry', `${c.name}'s membership renews in ${diffDays} days.`, c.id);
-           }
+          const alreadyNotified = existingNotifs.some(n =>
+            n.type === 'info' && n.relatedId === c.id && n.title.includes('Membership')
+          );
+          if (!alreadyNotified) {
+            createNotification('info', 'Membership Expiry', `${c.name}'s membership renews in ${diffDays} days.`, c.id);
+          }
         }
       });
-      
+
       checkNotifications();
     };
 
     runSystemChecks();
-    
+
     const interval = setInterval(() => {
-        checkNotifications();
-    }, 5000); 
-    
+      checkNotifications();
+    }, 5000);
+
     return () => clearInterval(interval);
-  }, [location.pathname]); 
+  }, [location.pathname]);
 
   // Handle Logout
   const handleLogout = () => {
-      authService.logout();
-      hasSynced.current = false; // Reset sync status so next login triggers a sync
-      navigate('/login');
+    authService.logout();
+    hasSynced.current = false; // Reset sync status so next login triggers a sync
+    navigate('/login');
   };
 
   const navItems = [
@@ -193,15 +202,18 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { to: '/assistant', icon: Sparkles, label: 'Smart Assistant', highlight: true },
   ];
 
-  if (user?.role === 'Admin') {
+  if (user?.role === 'Admin' || user?.role === 'Manager') {
     navItems.splice(11, 0, { to: '/reports', icon: BarChart2, label: 'Reports' }); // Insert reports before Assistant
+  }
+
+  if (user?.role === 'Admin') {
     navItems.push({ to: '/settings', icon: Settings, label: 'Settings', highlight: false });
   }
 
   // If we are on the login page, render just the children without layout
   // IMPORTANT: This must be AFTER all hooks are declared to avoid React Error #300
   if (location.pathname === '/login') {
-      return <>{children}</>;
+    return <>{children}</>;
   }
 
   return (
@@ -220,11 +232,24 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       {/* Sidebar - Desktop */}
       <aside className="hidden md:flex md:flex-col w-64 bg-white border-r border-gray-200">
         <div className="flex flex-col items-center justify-center h-32 border-b border-gray-100 p-2 bg-white">
-          <img 
-            src="/logo.png?v=2" 
-            alt="The London Salon" 
-            className="max-h-full w-auto object-contain transition-all duration-300" 
+          <img
+            src="/logo.png?v=2"
+            alt="The London Salon"
+            className="max-h-full w-auto object-contain transition-all duration-300"
           />
+        </div>
+
+        {/* User Info Section at Top */}
+        <div className="px-6 py-4 border-b border-gray-50 bg-gray-50/30">
+          <div className="flex items-center">
+            <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 font-bold text-lg shadow-sm border border-rose-200">
+              {user?.name?.charAt(0) || 'U'}
+            </div>
+            <div className="ml-3 overflow-hidden">
+              <p className="text-xs font-semibold text-rose-500 uppercase tracking-wider">Welcome back,</p>
+              <p className="text-sm font-bold text-gray-900 truncate" title={user?.name}>{user?.name || 'User'}</p>
+            </div>
+          </div>
         </div>
         <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
           {navItems.map((item) => (
@@ -232,10 +257,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               key={item.to}
               to={item.to}
               className={({ isActive }) =>
-                `flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                  isActive
-                    ? 'bg-rose-50 text-rose-600'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                `flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${isActive
+                  ? 'bg-rose-50 text-rose-600'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                 } ${item.highlight ? 'mt-4 border border-purple-100 bg-purple-50 text-purple-700 hover:bg-purple-100' : ''}`
               }
             >
@@ -243,31 +267,31 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               {item.label}
             </NavLink>
           ))}
-          
+
           <div className="mt-6 px-4 py-2 bg-gray-50 mx-2 rounded-md border border-gray-100">
-              <div className="flex items-start text-xs text-gray-500">
-                  <MapPin size={12} className="mt-0.5 mr-1 flex-shrink-0" />
-                  <p>Vibgyor High School Road, Thubarahalli, Whitefield, Bengaluru, Karnataka 560066</p>
-              </div>
+            <div className="flex items-start text-xs text-gray-500">
+              <MapPin size={12} className="mt-0.5 mr-1 flex-shrink-0" />
+              <p>Vibgyor High School Road, Thubarahalli, Whitefield, Bengaluru, Karnataka 560066</p>
+            </div>
           </div>
         </nav>
         <div className="p-4 border-t border-gray-100">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
-                <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 font-bold">
+              <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 font-bold">
                 {user?.name?.charAt(0) || 'A'}
-                </div>
-                <div className="ml-3">
+              </div>
+              <div className="ml-3">
                 <p className="text-sm font-medium text-gray-900">{user?.name || 'User'}</p>
                 <p className="text-xs text-gray-500">{user?.role || 'Staff'}</p>
-                </div>
+              </div>
             </div>
-            <button 
-                onClick={handleLogout}
-                className="text-gray-400 hover:text-red-600"
-                title="Logout"
+            <button
+              onClick={handleLogout}
+              className="text-gray-400 hover:text-red-600"
+              title="Logout"
             >
-                <LogOut size={18} />
+              <LogOut size={18} />
             </button>
           </div>
         </div>
@@ -288,7 +312,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </div>
             <div className="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
               <div className="flex-shrink-0 flex items-center justify-center px-4 mb-4 border-b border-gray-100 pb-4 h-24">
-                 <img src="/logo.png?v=2" alt="The London Salon" className="h-full w-auto object-contain" />
+                <img src="/logo.png?v=2" alt="The London Salon" className="h-full w-auto object-contain" />
               </div>
               <nav className="mt-2 px-2 space-y-1">
                 {navItems.map((item) => (
@@ -297,10 +321,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     to={item.to}
                     onClick={() => setIsMobileMenuOpen(false)}
                     className={({ isActive }) =>
-                      `flex items-center px-4 py-3 text-base font-medium rounded-md ${
-                        isActive
-                          ? 'bg-rose-50 text-rose-600'
-                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                      `flex items-center px-4 py-3 text-base font-medium rounded-md ${isActive
+                        ? 'bg-rose-50 text-rose-600'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                       }`
                     }
                   >
@@ -311,18 +334,18 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </nav>
             </div>
             <div className="p-4 border-t border-gray-100 flex justify-between items-center">
-                 <div className="flex items-center">
-                    <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 font-bold">
-                        {user?.name?.charAt(0) || 'A'}
-                    </div>
-                    <div className="ml-3">
-                        <p className="text-sm font-medium text-gray-900">{user?.name || 'User'}</p>
-                        <p className="text-xs text-gray-500">{user?.role || 'Staff'}</p>
-                    </div>
-                 </div>
-                 <button onClick={handleLogout} className="text-gray-500 hover:text-red-600">
-                    <LogOut size={20} />
-                 </button>
+              <div className="flex items-center">
+                <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 font-bold">
+                  {user?.name?.charAt(0) || 'A'}
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-gray-900">{user?.name || 'User'}</p>
+                  <p className="text-xs text-gray-500">{user?.role || 'Staff'}</p>
+                </div>
+              </div>
+              <button onClick={handleLogout} className="text-gray-500 hover:text-red-600">
+                <LogOut size={20} />
+              </button>
             </div>
           </div>
         </div>
@@ -332,50 +355,38 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       <div className="flex flex-col flex-1 w-0 overflow-hidden">
         <div className="flex justify-between md:justify-end items-center pl-1 pt-1 pr-4 sm:pl-3 sm:pt-3 bg-white border-b border-gray-200 h-16">
           <div className="md:hidden">
-             <button
-                className="-ml-0.5 -mt-0.5 h-12 w-12 inline-flex items-center justify-center rounded-md text-gray-500 hover:text-gray-900 focus:outline-none"
-                onClick={() => setIsMobileMenuOpen(true)}
-              >
-                <Menu className="h-6 w-6" />
-              </button>
+            <button
+              className="-ml-0.5 -mt-0.5 h-12 w-12 inline-flex items-center justify-center rounded-md text-gray-500 hover:text-gray-900 focus:outline-none"
+              onClick={() => setIsMobileMenuOpen(true)}
+            >
+              <Menu className="h-6 w-6" />
+            </button>
           </div>
-          
-          <div className="flex items-center space-x-4">
-            {/* View Data Link - Admin Only */}
-            {sheetViewUrl && user?.role === 'Admin' && (
-              <a 
-                href={sheetViewUrl} 
-                target="_blank" 
-                rel="noreferrer"
-                className="hidden md:flex items-center text-gray-600 hover:text-green-600 text-xs font-medium bg-white border border-gray-200 px-3 py-1 rounded-full transition-colors"
-                title="Open Google Sheet"
-              >
-                 <FileSpreadsheet className="w-3 h-3 mr-1.5" /> View Data
-              </a>
-            )}
 
-            {isCloudConfigured && (
-                <div title="Connected to Google Sheets" className="hidden md:flex items-center text-green-600 text-xs font-medium bg-green-50 px-2 py-1 rounded-full">
-                    <Cloud className="w-3 h-3 mr-1" /> Online
-                </div>
+          <div className="flex items-center space-x-4">
+
+            {isFirebaseConfigured && (
+              <div title="Connected to Firebase (Real-time)" className="hidden md:flex items-center text-orange-600 text-xs font-medium bg-orange-50 px-2 py-1 rounded-full">
+                <Flame className="w-3 h-3 mr-1" /> Firebase
+              </div>
             )}
 
             {/* IST Clock */}
             <div className="hidden sm:flex flex-col items-end border-r border-gray-200 pr-4 mr-2">
-                <span className="text-[10px] text-gray-500 font-medium uppercase tracking-wider">{dateStr}</span>
-                <span className="text-sm font-bold text-gray-800 font-mono leading-none mt-0.5">{timeStr}</span>
+              <span className="text-[10px] text-gray-500 font-medium uppercase tracking-wider">{dateStr}</span>
+              <span className="text-sm font-bold text-gray-800 font-mono leading-none mt-0.5">{timeStr}</span>
             </div>
 
-            <button 
-                onClick={() => navigate('/notifications')}
-                className="relative p-2 text-gray-500 hover:text-gray-700 focus:outline-none"
+            <button
+              onClick={() => navigate('/notifications')}
+              className="relative p-2 text-gray-500 hover:text-gray-700 focus:outline-none"
             >
-                <Bell className="h-6 w-6" />
-                {unreadCount > 0 && (
-                    <span className="absolute top-1 right-1 block h-4 w-4 rounded-full bg-red-500 text-white text-[10px] font-bold text-center leading-4">
-                        {unreadCount}
-                    </span>
-                )}
+              <Bell className="h-6 w-6" />
+              {unreadCount > 0 && (
+                <span className="absolute top-1 right-1 block h-4 w-4 rounded-full bg-red-500 text-white text-[10px] font-bold text-center leading-4">
+                  {unreadCount}
+                </span>
+              )}
             </button>
           </div>
         </div>
