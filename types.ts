@@ -186,3 +186,12 @@ export interface Lead {
   createdAt: string;
   comments: LeadComment[];
 }
+
+export interface Attendance {
+  id: string;
+  userId: string;
+  userName: string;
+  date: string; // YYYY-MM-DD
+  loginTime: string; // ISO String
+  logoutTime?: string; // ISO String
+}

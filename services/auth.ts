@@ -1,6 +1,7 @@
-import { signInWithEmailAndPassword, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { getFirebaseAuth } from './firebase';
-import { User } from '../types';
+import { User, Attendance } from '../types';
+import { db, generateId, getTodayIST } from './db';
 
 const AUTH_KEY = 'salon_auth_user';
 const USERS_COLLECTION = 'users'; // We'll store user profile info here
@@ -23,6 +24,18 @@ export const authService = {
             };
 
             localStorage.setItem(AUTH_KEY, JSON.stringify(user));
+
+            // Record Attendance
+            const attendance: Attendance = {
+                id: generateId(),
+                userId: fbUser.uid,
+                userName: user.name,
+                date: getTodayIST(),
+                loginTime: new Date().toISOString()
+            };
+            db.attendance.add(attendance);
+            localStorage.setItem('salon_active_session', attendance.id);
+
             return user;
         } catch (error: any) {
             console.error('Firebase Login Error:', error);
@@ -32,6 +45,16 @@ export const authService = {
 
     logout: async () => {
         const auth = getFirebaseAuth();
+
+        // Record Logout Time
+        const sessionId = localStorage.getItem('salon_active_session');
+        if (sessionId) {
+            const all = db.attendance.getAll();
+            const updated = all.map(a => a.id === sessionId ? { ...a, logoutTime: new Date().toISOString() } : a);
+            db.attendance.save(updated);
+            localStorage.removeItem('salon_active_session');
+        }
+
         if (auth) await signOut(auth);
         localStorage.removeItem(AUTH_KEY);
     },

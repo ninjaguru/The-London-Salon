@@ -73,13 +73,26 @@ const Categories: React.FC = () => {
         <div className="flex gap-2">
           <button
             onClick={() => exportToCSV(categories, 'categories')}
-            className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm"
+            className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-xl text-sm font-black text-slate-700 hover:bg-slate-50 shadow-sm transition-all"
           >
             <Download className="w-4 h-4 mr-2" /> Export
           </button>
+          {isAdmin && (
+            <button
+              onClick={() => {
+                if (window.confirm('CRITICAL: Delete ALL categories? This cannot be undone.')) {
+                  setCategories([]);
+                  db.categories.save([]);
+                }
+              }}
+              className="bg-red-50 hover:bg-red-100 text-red-600 px-4 py-2 rounded-xl flex items-center gap-2 transition-all border border-red-100 font-black text-sm"
+            >
+              <Trash2 size={18} /> Delete All
+            </button>
+          )}
           <button
             onClick={() => openModal()}
-            className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+            className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-all shadow-lg shadow-rose-200 font-black text-sm"
           >
             <Plus size={18} /> Add Category
           </button>

@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
 import Staff from './components/Staff';
@@ -20,6 +20,8 @@ import Coupons from './components/Coupons';
 import Settings from './components/Settings';
 import Login from './components/Login';
 import PublicMenu from './components/PublicMenu';
+import Attendance from './components/Attendance';
+import StaffAttendanceScan from './components/StaffAttendanceScan';
 import { authService } from './services/auth';
 
 // Guard component to check if user is logged in
@@ -32,15 +34,18 @@ const ProtectedRoute = ({ children }: { children?: React.ReactNode }) => {
 
 const App: React.FC = () => {
   return (
-    <MemoryRouter>
+    <Router>
       <Routes>
         {/* Public Facing Pages (No Layout) */}
         <Route path="/login" element={<Login />} />
         <Route path="/menu" element={<PublicMenu />} />
-        
+        <Route path="/attendance-scan" element={<StaffAttendanceScan />} />
+        <Route path="/attendance-scan/:staffId" element={<StaffAttendanceScan />} />
+
         {/* Protected Dashboard Pages (With Layout) */}
         <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/staff" element={<ProtectedRoute><Staff /></ProtectedRoute>} />
+        <Route path="/attendance" element={<ProtectedRoute><Attendance /></ProtectedRoute>} />
         <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
         <Route path="/categories" element={<ProtectedRoute><Categories /></ProtectedRoute>} />
         <Route path="/services" element={<ProtectedRoute><Services /></ProtectedRoute>} />
@@ -55,10 +60,10 @@ const App: React.FC = () => {
         <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
         <Route path="/assistant" element={<ProtectedRoute><AIAssistant /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-        
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </MemoryRouter>
+    </Router>
   );
 };
 

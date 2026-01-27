@@ -1,6 +1,6 @@
 
 import {
-  Staff, Product, Customer, Appointment, Sale, Package, Notification, Category, Service, Lead, CouponTemplate, Combo,
+  Staff, Product, Customer, Appointment, Sale, Package, Notification, Category, Service, Lead, CouponTemplate, Combo, Attendance,
   Role, AppointmentStatus
 } from '../types';
 import { firebaseService, getFirebaseDb } from './firebase';
@@ -34,6 +34,7 @@ const INITIAL_APPOINTMENTS: Appointment[] = [];
 const INITIAL_SALES: Sale[] = [];
 const INITIAL_NOTIFICATIONS: Notification[] = [];
 const INITIAL_COUPON_TEMPLATES: CouponTemplate[] = [];
+const INITIAL_ATTENDANCE: Attendance[] = [];
 
 class StorageService<T> {
   private key: string;
@@ -124,7 +125,8 @@ export const db = {
   appointments: new StorageService<Appointment>('salon_appointments_v6', INITIAL_APPOINTMENTS, 'Appointments'),
   sales: new StorageService<Sale>('salon_sales_v6', INITIAL_SALES, 'Sales'),
   notifications: new StorageService<Notification>('salon_notifications_v6', INITIAL_NOTIFICATIONS, 'Notifications'),
-  couponTemplates: new StorageService<CouponTemplate>('salon_coupon_templates_v6', INITIAL_COUPON_TEMPLATES, 'CouponTemplates')
+  couponTemplates: new StorageService<CouponTemplate>('salon_coupon_templates_v6', INITIAL_COUPON_TEMPLATES, 'CouponTemplates'),
+  attendance: new StorageService<Attendance>('salon_attendance_v6', INITIAL_ATTENDANCE, 'Attendance')
 };
 
 export const createNotification = (type: Notification['type'], title: string, message: string, relatedId?: string) => {

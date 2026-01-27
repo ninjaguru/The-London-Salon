@@ -21,7 +21,8 @@ import {
   Settings,
   TicketPercent,
   Layers,
-  Flame
+  Flame,
+  Clock
 } from 'lucide-react';
 import { db, createNotification, syncFromCloud, setupRealtimeSync } from '../services/db';
 import { authService } from '../services/auth';
@@ -192,6 +193,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { to: '/customers', icon: Users, label: 'Customers' },
     { to: '/leads', icon: Target, label: 'Leads' },
     { to: '/staff', icon: Scissors, label: 'Staff' },
+    { to: '/attendance', icon: Clock, label: 'Attendance' },
     { to: '/services', icon: Sparkle, label: 'Services' },
     { to: '/combos', icon: Layers, label: 'Combos' },
     { to: '/inventory', icon: ShoppingBag, label: 'Inventory' },
