@@ -79,7 +79,7 @@ const StaffAttendanceConfirm: React.FC = () => {
                     <QrCode className="w-16 h-16 text-rose-500 mx-auto mb-4" />
                     <h2 className="text-white text-xl font-black uppercase mb-2">Invalid Session</h2>
                     <p className="text-white/60 mb-6">Please scan the QR code from the salon terminal again.</p>
-                    <button onClick={() => navigate('/')} className="w-full py-3 bg-rose-600 text-white font-black rounded-xl">Go Home</button>
+                    <button onClick={() => window.location.reload()} className="w-full py-3 bg-rose-600 text-white font-black rounded-xl italic">REFRESH PAGE</button>
                 </div>
             </div>
         );
@@ -118,22 +118,11 @@ const StaffAttendanceConfirm: React.FC = () => {
                                 </h3>
                                 <p className="text-white/70 text-xl font-medium">{status?.message}</p>
                             </div>
-                            <button
-                                onClick={() => navigate('/')}
-                                className="px-12 py-5 bg-white/10 hover:bg-white/20 text-white font-black rounded-3xl border border-white/20 transition-all uppercase"
-                            >
-                                Back to Home
-                            </button>
+                            <p className="text-white/20 text-xs font-black uppercase tracking-[0.2em] pt-4">You may close this window</p>
                         </div>
                     )}
                 </div>
             </div>
-            <button
-                onClick={() => navigate('/')}
-                className="mt-12 group flex items-center text-white/40 hover:text-white transition-all text-sm font-black tracking-widest uppercase"
-            >
-                <ArrowLeft className="mr-2 group-hover:-translate-x-2 transition-transform" /> Back to Salon
-            </button>
         </div>
     );
 };

@@ -137,12 +137,6 @@ const StaffAttendanceTerminal: React.FC = () => {
                 </div>
             </div>
 
-            <button
-                onClick={() => navigate('/')}
-                className="mt-12 group flex items-center text-white/40 hover:text-white transition-all text-sm font-black tracking-widest uppercase"
-            >
-                <ArrowLeft className="mr-2 group-hover:-translate-x-2 transition-transform" /> Back to Dashboard
-            </button>
         </div>
     );
 };
