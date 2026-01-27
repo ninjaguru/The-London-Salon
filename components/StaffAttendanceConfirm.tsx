@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { db, generateId, getTodayIST } from '../services/db';
-import { Staff, Attendance } from '../types';
+import { db, generateId, getTodayIST, syncFromCloud } from '../services/db';
+import { Staff, Attendance, Role } from '../types';
 import { CheckCircle2, User, ArrowLeft, QrCode } from 'lucide-react';
 
 const StaffAttendanceConfirm: React.FC = () => {
@@ -17,13 +17,21 @@ const StaffAttendanceConfirm: React.FC = () => {
     useEffect(() => {
         const staffIdParam = searchParams.get('staffId');
         const actionParam = searchParams.get('action');
+        const nameParam = searchParams.get('name');
 
         if (staffIdParam && actionParam) {
-            const staff = db.staff.getAll().find(s => s.id === staffIdParam);
-            if (staff) {
-                setSelectedStaff(staff);
-                setSelectedAction(actionParam as 'login' | 'logout');
-            }
+            // Try to find staff in local DB first, fallback to URL name
+            const dbStaff = db.staff.getAll().find(s => s.id === staffIdParam);
+            setSelectedStaff(dbStaff || {
+                id: staffIdParam,
+                name: nameParam || 'Staff Member',
+                role: Role.HairStylist,
+                active: true
+            } as Staff);
+            setSelectedAction(actionParam as 'login' | 'logout');
+
+            // Trigger background sync to get latest attendance data just in case
+            syncFromCloud().catch(console.error);
         }
     }, [searchParams]);
 
@@ -35,14 +43,7 @@ const StaffAttendanceConfirm: React.FC = () => {
         const allAttendance = db.attendance.getAll();
 
         if (selectedAction === 'login') {
-            const alreadyIn = allAttendance.find(a => a.userId === selectedStaff.id && a.date === today && !a.logoutTime);
-            if (alreadyIn) {
-                setStatus({ type: 'error', message: `Already punched in at ${new Date(alreadyIn.loginTime).toLocaleTimeString()}.` });
-                setLoading(false);
-                setSuccess(true);
-                return;
-            }
-
+            // No validation: just add a new login entry
             const newEntry: Attendance = {
                 id: generateId(),
                 userId: selectedStaff.id,
@@ -51,21 +52,29 @@ const StaffAttendanceConfirm: React.FC = () => {
                 loginTime: new Date().toISOString()
             };
             db.attendance.add(newEntry);
-            setStatus({ type: 'success', message: `Punch In successful! Have a great shift, ${selectedStaff.name}.` });
+            setStatus({ type: 'success', message: `Punch In recorded! Have a great shift, ${selectedStaff.name}.` });
         } else {
+            // No validation: try to update active session, else create a logout-only entry
             const activeSession = allAttendance.find(a => a.userId === selectedStaff.id && a.date === today && !a.logoutTime);
-            if (!activeSession) {
-                setStatus({ type: 'error', message: 'No active punch-in found for today.' });
-                setLoading(false);
-                setSuccess(true);
-                return;
-            }
 
-            const updated = allAttendance.map(a =>
-                a.id === activeSession.id ? { ...a, logoutTime: new Date().toISOString() } : a
-            );
-            db.attendance.save(updated);
-            setStatus({ type: 'success', message: `Punch Out successful! Goodbye, ${selectedStaff.name}.` });
+            if (activeSession) {
+                const updated = allAttendance.map(a =>
+                    a.id === activeSession.id ? { ...a, logoutTime: new Date().toISOString() } : a
+                );
+                db.attendance.save(updated);
+            } else {
+                // Create a record with login = logout time to at least show they worked (or logout only)
+                const newEntry: Attendance = {
+                    id: generateId(),
+                    userId: selectedStaff.id,
+                    userName: selectedStaff.name,
+                    date: today,
+                    loginTime: new Date().toISOString(), // Fallback login time
+                    logoutTime: new Date().toISOString()
+                };
+                db.attendance.add(newEntry);
+            }
+            setStatus({ type: 'success', message: `Punch Out recorded! Goodbye, ${selectedStaff.name}.` });
         }
 
         setLoading(false);

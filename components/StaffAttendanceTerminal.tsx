@@ -36,7 +36,7 @@ const StaffAttendanceTerminal: React.FC = () => {
     const generateQrUrl = () => {
         if (!selectedStaff || !selectedAction) return '';
         const baseUrl = window.location.origin + window.location.pathname + '#/attendance-confirm';
-        const fullUrl = `${baseUrl}?staffId=${selectedStaff.id}&action=${selectedAction}`;
+        const fullUrl = `${baseUrl}?staffId=${selectedStaff.id}&action=${selectedAction}&name=${encodeURIComponent(selectedStaff.name)}`;
         return `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(fullUrl)}`;
     };
 
