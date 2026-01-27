@@ -3,8 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
 import { Staff } from '../types';
-import { Clock, ArrowLeft, LogIn, LogOut } from 'lucide-react';
-import { firebaseService } from '../services/firebase';
+import { Clock, ArrowLeft, LogIn, LogOut, CheckCircle2 } from 'lucide-react';
+import { firebaseService, getFirebaseDb } from '../services/firebase';
+import { collection, query, where, onSnapshot, limit, orderBy } from 'firebase/firestore';
 
 const StaffAttendanceTerminal: React.FC = () => {
     const navigate = useNavigate();
@@ -12,6 +13,7 @@ const StaffAttendanceTerminal: React.FC = () => {
     const [step, setStep] = useState<'type' | 'staff' | 'qr'>('type');
     const [selectedAction, setSelectedAction] = useState<'login' | 'logout' | null>(null);
     const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
+    const [isSuccess, setIsSuccess] = useState(false);
 
     useEffect(() => {
         const list = db.staff.getAll().filter(s => s.active);
@@ -25,8 +27,48 @@ const StaffAttendanceTerminal: React.FC = () => {
 
     const handleStaffSelect = (staff: Staff) => {
         setSelectedStaff(staff);
+        setIsSuccess(false);
         setStep('qr');
     };
+
+    // Real-time listener for scan completion
+    useEffect(() => {
+        if (step !== 'qr' || !selectedStaff || !selectedAction) return;
+
+        const db = getFirebaseDb();
+        if (!db) return;
+
+        // Listen for new attendance logs - simplified to avoid index requirement
+        const q = query(
+            collection(db, 'salon_attendance'),
+            orderBy('updatedAt', 'desc'),
+            limit(5)
+        );
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            snapshot.docChanges().forEach((change) => {
+                if (change.type === 'added' || change.type === 'modified') {
+                    const data = change.doc.data();
+
+                    // Filter for our selected staff
+                    if (data.userId === selectedStaff.id) {
+                        const actionTime = new Date(data.updatedAt).getTime();
+                        const now = Date.now();
+
+                        // If the change happened in the last 60 seconds, it's likely our scan
+                        if (now - actionTime < 60000) {
+                            setIsSuccess(true);
+                            setTimeout(() => {
+                                reset();
+                            }, 3000); // Back to start after 3 seconds
+                        }
+                    }
+                }
+            });
+        });
+
+        return () => unsubscribe();
+    }, [step, selectedStaff, selectedAction]);
 
     const reset = () => {
         setStep('type');
@@ -40,7 +82,7 @@ const StaffAttendanceTerminal: React.FC = () => {
 
         // Include Firebase config in the URL so staff phone can sync
         const config = firebaseService.getConfig();
-        const configParam = config ? `&fc=${btoa(JSON.stringify(config))}` : '';
+        const configParam = config ? `&fc=${encodeURIComponent(btoa(JSON.stringify(config)))}` : '';
 
         const fullUrl = `${baseUrl}?staffId=${selectedStaff.id}&action=${selectedAction}&name=${encodeURIComponent(selectedStaff.name)}${configParam}`;
         return `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(fullUrl)}`;
@@ -51,7 +93,12 @@ const StaffAttendanceTerminal: React.FC = () => {
             <div className="max-w-4xl w-full bg-white/10 backdrop-blur-xl rounded-[3rem] shadow-2xl border border-white/20 overflow-hidden">
 
                 {/* Header */}
-                <div className="p-8 text-center bg-gradient-to-r from-rose-500/20 to-orange-500/20 border-b border-white/10">
+                <div className="p-8 text-center bg-gradient-to-r from-rose-500/20 to-orange-500/20 border-b border-white/10 relative">
+                    {!firebaseService.isConfigured() && (
+                        <div className="absolute top-0 left-0 right-0 bg-orange-500 text-white text-[10px] font-bold py-1 uppercase tracking-widest animate-pulse">
+                            Offline Mode: Firebase Not Configured in Settings
+                        </div>
+                    )}
                     <h1 className="text-4xl font-black text-white tracking-tighter uppercase italic flex items-center justify-center gap-4">
                         <Clock className="w-10 h-10 text-rose-400" />
                         Staff Terminal
@@ -116,20 +163,35 @@ const StaffAttendanceTerminal: React.FC = () => {
                     {/* Step: QR Code */}
                     {step === 'qr' && (
                         <div className="text-center space-y-8 animate-in zoom-in duration-500">
-                            <div className="flex items-center justify-center gap-4">
-                                <button onClick={() => setStep('staff')} className="p-3 bg-white/5 rounded-2xl text-white hover:bg-white/10 transition-colors">
-                                    <ArrowLeft />
-                                </button>
-                                <h3 className="text-2xl font-bold text-white uppercase tracking-widest">Scan to {selectedAction}</h3>
-                            </div>
-                            <div className="inline-block p-8 bg-white rounded-[3rem] shadow-2xl shadow-rose-500/20 ring-8 ring-rose-500/10">
-                                <img src={generateQrUrl()} alt="QR" className="w-64 h-64 md:w-80 md:h-80" />
-                            </div>
-                            <div className="bg-white/5 p-6 rounded-3xl border border-white/10 max-w-sm mx-auto">
-                                <p className="text-rose-300 font-bold mb-1">Authenticating as</p>
-                                <p className="text-white text-xl font-black">{selectedStaff?.name}</p>
-                            </div>
-                            <p className="text-white/40 text-sm font-medium animate-pulse">Waiting for scan...</p>
+                            {!isSuccess ? (
+                                <>
+                                    <div className="flex items-center justify-center gap-4">
+                                        <button onClick={() => setStep('staff')} className="p-3 bg-white/5 rounded-2xl text-white hover:bg-white/10 transition-colors">
+                                            <ArrowLeft />
+                                        </button>
+                                        <h3 className="text-2xl font-bold text-white uppercase tracking-widest">Scan to {selectedAction}</h3>
+                                    </div>
+                                    <div className="inline-block p-8 bg-white rounded-[3rem] shadow-2xl shadow-rose-500/20 ring-8 ring-rose-500/10">
+                                        <img src={generateQrUrl()} alt="QR" className="w-64 h-64 md:w-80 md:h-80" />
+                                    </div>
+                                    <div className="bg-white/5 p-6 rounded-3xl border border-white/10 max-w-sm mx-auto">
+                                        <p className="text-rose-300 font-bold mb-1">Authenticating as</p>
+                                        <p className="text-white text-xl font-black">{selectedStaff?.name}</p>
+                                    </div>
+                                    <p className="text-white/40 text-sm font-medium animate-pulse">Waiting for scan...</p>
+                                </>
+                            ) : (
+                                <div className="py-20 flex flex-col items-center gap-6 animate-in zoom-in duration-300">
+                                    <div className="w-32 h-32 bg-green-500 rounded-full flex items-center justify-center shadow-2xl shadow-green-500/50">
+                                        <CheckCircle2 className="w-20 h-20 text-white" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-5xl font-black text-white uppercase italic mb-2 tracking-tighter">SUCCESS!</h2>
+                                        <p className="text-green-400 text-xl font-bold">{selectedAction?.toUpperCase()} RECORDED</p>
+                                    </div>
+                                    <p className="text-white/40 font-medium">Have a great day, {selectedStaff?.name}</p>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

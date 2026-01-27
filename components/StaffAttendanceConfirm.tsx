@@ -19,6 +19,20 @@ const StaffAttendanceConfirm: React.FC = () => {
         const staffIdParam = searchParams.get('staffId');
         const actionParam = searchParams.get('action');
         const nameParam = searchParams.get('name');
+        const encodedConfig = searchParams.get('fc');
+
+        // Auto-configure Firebase from URL if provided (for remote staff phones)
+        if (encodedConfig && !firebaseService.isConfigured()) {
+            try {
+                // Decode from URL and then Base64
+                const decodedConfig = atob(decodeURIComponent(encodedConfig));
+                const config = JSON.parse(decodedConfig);
+                firebaseService.setConfig(config);
+                console.log('Auto-configured Firebase from Terminal link');
+            } catch (e) {
+                console.error('Failed to parse Firebase config from URL', e);
+            }
+        }
 
         if (staffIdParam && actionParam) {
             // Try to find staff in local DB first, fallback to URL name
@@ -31,20 +45,8 @@ const StaffAttendanceConfirm: React.FC = () => {
             } as Staff);
             setSelectedAction(actionParam as 'login' | 'logout');
 
-            // Trigger background sync to get latest attendance data just in case
+            // Trigger background sync now that Firebase is potentially configured
             syncFromCloud().catch(console.error);
-        }
-
-        // Auto-configure Firebase from URL if provided (for remote staff phones)
-        const encodedConfig = searchParams.get('fc');
-        if (encodedConfig && !firebaseService.isConfigured()) {
-            try {
-                const config = JSON.parse(atob(encodedConfig));
-                firebaseService.setConfig(config);
-                console.log('Auto-configured Firebase from Terminal link');
-            } catch (e) {
-                console.error('Failed to parse Firebase config from URL', e);
-            }
         }
     }, [searchParams]);
 

@@ -83,13 +83,20 @@ class StorageService<T> {
 
           // Special handling for Attendance: Save individual entry to shared collection
           // This prevents different staff phones from overwriting each other's logs
-          if (this.tableName === 'Attendance') {
-            const lastItem = (data as any)[0]; // Assuming add prepends
+          if (this.tableName === 'Attendance' && data.length > 0) {
+            // Find the most recently active entry (latest login or logout)
+            const sorted = [...(data as any)].sort((a, b) => {
+              const timeA = new Date(a.logoutTime || a.loginTime).getTime();
+              const timeB = new Date(b.logoutTime || b.loginTime).getTime();
+              return timeB - timeA;
+            });
+
+            const lastItem = sorted[0];
             if (lastItem && lastItem.id) {
               setDoc(doc(firestore, 'salon_attendance', lastItem.id), {
                 ...lastItem,
                 updatedAt: new Date().toISOString()
-              }).then(() => console.log('Synced individual attendance entry'));
+              }).then(() => console.log('Synced individual attendance entry:', lastItem.userName));
             }
           }
 
@@ -192,16 +199,29 @@ export const syncFromCloud = async () => {
 
     try {
       const querySnapshot = await getDocs(collection(firestore, 'salon_vault'));
-      querySnapshot.forEach((doc) => {
-        const tableName = doc.id;
-        const cloudData = doc.data().data;
 
-        // Map Firebase collection names to our db keys
+      const promises = querySnapshot.docs.map(async (docSnap) => {
+        const tableName = docSnap.id;
+        let cloudData = docSnap.data().data;
+
+        // Special handling for Attendance: Always fetch and merge individual logs
+        if (tableName === 'Attendance') {
+          try {
+            const logsSnap = await getDocs(collection(firestore, 'salon_attendance'));
+            const allLogs = logsSnap.docs.map(d => d.data() as Attendance);
+            cloudData = allLogs.sort((a, b) => new Date(b.loginTime).getTime() - new Date(a.loginTime).getTime());
+          } catch (e) {
+            console.warn('Failed to fetch individual attendance logs during sync', e);
+          }
+        }
+
         const dbKey = Object.keys(db).find(key => (db as any)[key].tableName === tableName);
         if (dbKey && cloudData) {
           (db as any)[dbKey].overrideLocal(cloudData);
         }
       });
+
+      await Promise.all(promises);
       return { success: true, message: 'Data synchronized from Firebase.' };
     } catch (e) {
       console.error('Firebase Sync Error:', e);
