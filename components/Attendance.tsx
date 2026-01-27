@@ -118,6 +118,14 @@ const Attendance: React.FC = () => {
                         <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
                     </div>
                     <button
+                        onClick={() => window.open('#/attendance-terminal', '_blank')}
+                        className="p-2.5 bg-rose-600 border border-rose-500 rounded-xl text-white hover:bg-rose-700 transition-all font-bold group flex items-center gap-2"
+                        title="Open Staff Terminal"
+                    >
+                        <QrCode className="w-5 h-5" />
+                        <span className="hidden md:inline">Staff Terminal</span>
+                    </button>
+                    <button
                         onClick={() => exportToCSV(entries, 'attendance_full_report')}
                         className="p-2.5 bg-white border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 transition-all font-bold group"
                         title="Export All Data"

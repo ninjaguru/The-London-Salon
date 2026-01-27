@@ -1,37 +1,21 @@
 
 import React, { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
-import { db, generateId, getTodayIST } from '../services/db';
-import { Staff, Attendance } from '../types';
-import { Clock, CheckCircle2, User, LogIn, LogOut, ArrowLeft, QrCode } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { db } from '../services/db';
+import { Staff } from '../types';
+import { Clock, ArrowLeft, LogIn, LogOut } from 'lucide-react';
 
-const StaffAttendanceScan: React.FC = () => {
-    const [searchParams] = useSearchParams();
+const StaffAttendanceTerminal: React.FC = () => {
     const navigate = useNavigate();
     const [staffList, setStaffList] = useState<Staff[]>([]);
-    const [step, setStep] = useState<'type' | 'staff' | 'qr' | 'confirm' | 'success'>('type');
+    const [step, setStep] = useState<'type' | 'staff' | 'qr'>('type');
     const [selectedAction, setSelectedAction] = useState<'login' | 'logout' | null>(null);
     const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
-    const [status, setStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
-    const [loading, setLoading] = useState(false);
 
-    // Check for query params (staff member's phone after scanning)
     useEffect(() => {
-        const staffIdParam = searchParams.get('staffId');
-        const actionParam = searchParams.get('action');
-
-        if (staffIdParam && actionParam) {
-            const staff = db.staff.getAll().find(s => s.id === staffIdParam);
-            if (staff) {
-                setSelectedStaff(staff);
-                setSelectedAction(actionParam as 'login' | 'logout');
-                setStep('confirm');
-            }
-        }
-
         const list = db.staff.getAll().filter(s => s.active);
         setStaffList(list);
-    }, [searchParams]);
+    }, []);
 
     const handleActionSelect = (action: 'login' | 'logout') => {
         setSelectedAction(action);
@@ -43,62 +27,15 @@ const StaffAttendanceScan: React.FC = () => {
         setStep('qr');
     };
 
-    const handleConfirm = () => {
-        if (!selectedStaff || !selectedAction) return;
-
-        setLoading(true);
-        const today = getTodayIST();
-        const allAttendance = db.attendance.getAll();
-
-        if (selectedAction === 'login') {
-            const alreadyIn = allAttendance.find(a => a.userId === selectedStaff.id && a.date === today && !a.logoutTime);
-            if (alreadyIn) {
-                setStatus({ type: 'error', message: `Already punched in at ${new Date(alreadyIn.loginTime).toLocaleTimeString()}.` });
-                setLoading(false);
-                setStep('success');
-                return;
-            }
-
-            const newEntry: Attendance = {
-                id: generateId(),
-                userId: selectedStaff.id,
-                userName: selectedStaff.name,
-                date: today,
-                loginTime: new Date().toISOString()
-            };
-            db.attendance.add(newEntry);
-            setStatus({ type: 'success', message: `Punch In successful! Have a great shift, ${selectedStaff.name}.` });
-        } else {
-            const activeSession = allAttendance.find(a => a.userId === selectedStaff.id && a.date === today && !a.logoutTime);
-            if (!activeSession) {
-                setStatus({ type: 'error', message: 'No active punch-in found for today.' });
-                setLoading(false);
-                setStep('success');
-                return;
-            }
-
-            const updated = allAttendance.map(a =>
-                a.id === activeSession.id ? { ...a, logoutTime: new Date().toISOString() } : a
-            );
-            db.attendance.save(updated);
-            setStatus({ type: 'success', message: `Punch Out successful! Goodbye, ${selectedStaff.name}.` });
-        }
-
-        setLoading(false);
-        setStep('success');
-    };
-
     const reset = () => {
         setStep('type');
         setSelectedAction(null);
         setSelectedStaff(null);
-        setStatus(null);
-        navigate('/attendance-scan');
     };
 
     const generateQrUrl = () => {
         if (!selectedStaff || !selectedAction) return '';
-        const baseUrl = window.location.origin + window.location.pathname + '#/attendance-scan';
+        const baseUrl = window.location.origin + window.location.pathname + '#/attendance-confirm';
         const fullUrl = `${baseUrl}?staffId=${selectedStaff.id}&action=${selectedAction}`;
         return `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(fullUrl)}`;
     };
@@ -189,52 +126,11 @@ const StaffAttendanceScan: React.FC = () => {
                             <p className="text-white/40 text-sm font-medium animate-pulse">Waiting for scan...</p>
                         </div>
                     )}
-
-                    {/* Step: Confirm (Phone View) */}
-                    {step === 'confirm' && (
-                        <div className="text-center space-y-8 animate-in fade-in duration-500">
-                            <div className="w-24 h-24 bg-rose-500 rounded-full flex items-center justify-center mx-auto shadow-2xl shadow-rose-500/50">
-                                <QrCode className="text-white w-12 h-12" />
-                            </div>
-                            <div className="space-y-2">
-                                <h3 className="text-3xl font-black text-white uppercase italic">Confirm {selectedAction}</h3>
-                                <p className="text-rose-300 font-medium">Hello, {selectedStaff?.name}</p>
-                            </div>
-                            <button
-                                onClick={handleConfirm}
-                                disabled={loading}
-                                className="w-full max-w-md py-6 bg-gradient-to-r from-rose-600 to-orange-600 text-white text-2xl font-black rounded-3xl shadow-xl shadow-rose-900/40 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50"
-                            >
-                                {loading ? 'Processing...' : `SUBMIT ${selectedAction?.toUpperCase()}`}
-                            </button>
-                        </div>
-                    )}
-
-                    {/* Step: Success */}
-                    {step === 'success' && (
-                        <div className="text-center space-y-8 animate-in zoom-in duration-500">
-                            <div className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto shadow-2xl ${status?.type === 'success' ? 'bg-green-500 shadow-green-500/50' : 'bg-red-500 shadow-red-500/50'}`}>
-                                {status?.type === 'success' ? <CheckCircle2 className="text-white w-12 h-12" /> : <User className="text-white w-12 h-12" />}
-                            </div>
-                            <div className="space-y-4">
-                                <h3 className={`text-4xl font-black uppercase tracking-tighter ${status?.type === 'success' ? 'text-green-400' : 'text-red-400'}`}>
-                                    {status?.type === 'success' ? 'Success!' : 'Oops!'}
-                                </h3>
-                                <p className="text-white/70 text-xl font-medium max-w-md mx-auto">{status?.message}</p>
-                            </div>
-                            <button
-                                onClick={reset}
-                                className="px-12 py-5 bg-white/10 hover:bg-white/20 text-white font-black rounded-3xl border border-white/20 transition-all"
-                            >
-                                DONE
-                            </button>
-                        </div>
-                    )}
                 </div>
 
                 {/* Footer */}
                 <div className="p-6 bg-black/20 border-t border-white/5 flex justify-between items-center text-white/30 text-xs font-bold uppercase tracking-[0.3em]">
-                    <span>SalonVault Attendance v2.0</span>
+                    <span>SalonVault Attendance Terminal</span>
                     {step !== 'type' && (
                         <button onClick={reset} className="hover:text-rose-400 transition-colors uppercase">Cancel / Back</button>
                     )}
@@ -251,4 +147,4 @@ const StaffAttendanceScan: React.FC = () => {
     );
 };
 
-export default StaffAttendanceScan;
+export default StaffAttendanceTerminal;

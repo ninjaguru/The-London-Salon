@@ -21,7 +21,8 @@ import Settings from './components/Settings';
 import Login from './components/Login';
 import PublicMenu from './components/PublicMenu';
 import Attendance from './components/Attendance';
-import StaffAttendanceScan from './components/StaffAttendanceScan';
+import StaffAttendanceTerminal from './components/StaffAttendanceTerminal';
+import StaffAttendanceConfirm from './components/StaffAttendanceConfirm';
 import { authService } from './services/auth';
 
 // Guard component to check if user is logged in
@@ -39,8 +40,8 @@ const App: React.FC = () => {
         {/* Public Facing Pages (No Layout) */}
         <Route path="/login" element={<Login />} />
         <Route path="/menu" element={<PublicMenu />} />
-        <Route path="/attendance-scan" element={<StaffAttendanceScan />} />
-        <Route path="/attendance-scan/:staffId" element={<StaffAttendanceScan />} />
+        <Route path="/attendance-terminal" element={<StaffAttendanceTerminal />} />
+        <Route path="/attendance-confirm" element={<StaffAttendanceConfirm />} />
 
         {/* Protected Dashboard Pages (With Layout) */}
         <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
