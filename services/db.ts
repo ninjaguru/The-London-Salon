@@ -81,6 +81,18 @@ class StorageService<T> {
             if (userJson) userName = JSON.parse(userJson).name;
           } catch (e) { }
 
+          // Special handling for Attendance: Save individual entry to shared collection
+          // This prevents different staff phones from overwriting each other's logs
+          if (this.tableName === 'Attendance') {
+            const lastItem = (data as any)[0]; // Assuming add prepends
+            if (lastItem && lastItem.id) {
+              setDoc(doc(firestore, 'salon_attendance', lastItem.id), {
+                ...lastItem,
+                updatedAt: new Date().toISOString()
+              }).then(() => console.log('Synced individual attendance entry'));
+            }
+          }
+
           setDoc(doc(firestore, 'salon_vault', this.tableName), {
             data,
             updatedAt: new Date().toISOString(),
@@ -207,19 +219,23 @@ export const setupRealtimeSync = () => {
   if (!firestore) return null;
 
   return onSnapshot(collection(firestore, 'salon_vault'), (snapshot) => {
-    snapshot.docChanges().forEach((change) => {
+    snapshot.docChanges().forEach(async (change) => {
       if (change.type === 'added' || change.type === 'modified') {
         const tableName = change.doc.id;
-        const cloudData = change.doc.data().data;
-        const updatedAt = change.doc.data().updatedAt;
+        let cloudData = change.doc.data().data;
 
-        // Only override if cloud is newer or different
+        // Special handling for Attendance: Always fetch and merge individual logs
+        if (tableName === 'Attendance') {
+          const logsSnap = await getDocs(collection(firestore, 'salon_attendance'));
+          const allLogs = logsSnap.docs.map(d => d.data() as Attendance);
+          cloudData = allLogs.sort((a, b) => new Date(b.loginTime).getTime() - new Date(a.loginTime).getTime());
+        }
+
         const dbKey = Object.keys(db).find(key => (db as any)[key].tableName === tableName);
         if (dbKey && cloudData) {
           const store = (db as any)[dbKey];
           const localData = store.getAll();
           if (JSON.stringify(localData) !== JSON.stringify(cloudData)) {
-            console.log(`Real-time update for ${tableName}`);
             store.overrideLocal(cloudData);
           }
         }

@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { db, generateId, getTodayIST, syncFromCloud } from '../services/db';
 import { Staff, Attendance, Role } from '../types';
-import { CheckCircle2, User, ArrowLeft, QrCode } from 'lucide-react';
+import { Clock, ArrowLeft, LogIn, LogOut, QrCode, CheckCircle2, User } from 'lucide-react';
+import { firebaseService } from '../services/firebase';
 
 const StaffAttendanceConfirm: React.FC = () => {
     const [searchParams] = useSearchParams();
@@ -32,6 +33,18 @@ const StaffAttendanceConfirm: React.FC = () => {
 
             // Trigger background sync to get latest attendance data just in case
             syncFromCloud().catch(console.error);
+        }
+
+        // Auto-configure Firebase from URL if provided (for remote staff phones)
+        const encodedConfig = searchParams.get('fc');
+        if (encodedConfig && !firebaseService.isConfigured()) {
+            try {
+                const config = JSON.parse(atob(encodedConfig));
+                firebaseService.setConfig(config);
+                console.log('Auto-configured Firebase from Terminal link');
+            } catch (e) {
+                console.error('Failed to parse Firebase config from URL', e);
+            }
         }
     }, [searchParams]);
 

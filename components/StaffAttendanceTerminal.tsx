@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
 import { Staff } from '../types';
 import { Clock, ArrowLeft, LogIn, LogOut } from 'lucide-react';
+import { firebaseService } from '../services/firebase';
 
 const StaffAttendanceTerminal: React.FC = () => {
     const navigate = useNavigate();
@@ -36,7 +37,12 @@ const StaffAttendanceTerminal: React.FC = () => {
     const generateQrUrl = () => {
         if (!selectedStaff || !selectedAction) return '';
         const baseUrl = window.location.origin + window.location.pathname + '#/attendance-confirm';
-        const fullUrl = `${baseUrl}?staffId=${selectedStaff.id}&action=${selectedAction}&name=${encodeURIComponent(selectedStaff.name)}`;
+
+        // Include Firebase config in the URL so staff phone can sync
+        const config = firebaseService.getConfig();
+        const configParam = config ? `&fc=${btoa(JSON.stringify(config))}` : '';
+
+        const fullUrl = `${baseUrl}?staffId=${selectedStaff.id}&action=${selectedAction}&name=${encodeURIComponent(selectedStaff.name)}${configParam}`;
         return `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(fullUrl)}`;
     };
 
