@@ -238,30 +238,44 @@ export const setupRealtimeSync = () => {
   const firestore = getFirebaseDb();
   if (!firestore) return null;
 
-  return onSnapshot(collection(firestore, 'salon_vault'), (snapshot) => {
+  const unsubscribers: (() => void)[] = [];
+
+  // 1. Listen to the main Vault for all tables
+  const unsubVault = onSnapshot(collection(firestore, 'salon_vault'), (snapshot) => {
     snapshot.docChanges().forEach(async (change) => {
       if (change.type === 'added' || change.type === 'modified') {
         const tableName = change.doc.id;
-        let cloudData = change.doc.data().data;
 
-        // Special handling for Attendance: Always fetch and merge individual logs
-        if (tableName === 'Attendance') {
-          const logsSnap = await getDocs(collection(firestore, 'salon_attendance'));
-          const allLogs = logsSnap.docs.map(d => d.data() as Attendance);
-          cloudData = allLogs.sort((a, b) => new Date(b.loginTime).getTime() - new Date(a.loginTime).getTime());
-        }
+        // Skip Attendance here if we are listening to it directly
+        if (tableName === 'Attendance') return;
 
+        const cloudData = change.doc.data().data;
         const dbKey = Object.keys(db).find(key => (db as any)[key].tableName === tableName);
         if (dbKey && cloudData) {
           const store = (db as any)[dbKey];
-          const localData = store.getAll();
-          if (JSON.stringify(localData) !== JSON.stringify(cloudData)) {
+          if (JSON.stringify(store.getAll()) !== JSON.stringify(cloudData)) {
             store.overrideLocal(cloudData);
           }
         }
       }
     });
-  });
+  }, (err) => console.warn('Vault listener error:', err));
+  unsubscribers.push(unsubVault);
+
+  // 2. Direct listener for Attendance logs (Individual documents)
+  const unsubAttendance = onSnapshot(collection(firestore, 'salon_attendance'), (snapshot) => {
+    const allLogs = snapshot.docs.map(d => d.data() as Attendance);
+    const sortedLogs = allLogs.sort((a, b) => new Date(b.loginTime).getTime() - new Date(a.loginTime).getTime());
+
+    const localLogs = db.attendance.getAll();
+    if (JSON.stringify(localLogs) !== JSON.stringify(sortedLogs)) {
+      console.log('Real-time sync: Received new attendance records');
+      db.attendance.overrideLocal(sortedLogs);
+    }
+  }, (err) => console.warn('Attendance listener error (check rules):', err));
+  unsubscribers.push(unsubAttendance);
+
+  return () => unsubscribers.forEach(unsub => unsub());
 };
 
 // Helper for local pagination (if needed)
