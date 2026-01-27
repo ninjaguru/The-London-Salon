@@ -25,8 +25,13 @@ const Staff: React.FC = () => {
   const [salary, setSalary] = useState(0);
 
   useEffect(() => {
-    setStaffList(db.staff.getAll());
-    setAppointments(db.appointments.getAll());
+    const loadData = () => {
+      setStaffList(db.staff.getAll());
+      setAppointments(db.appointments.getAll());
+    };
+    loadData();
+    window.addEventListener('db-updated', loadData);
+    return () => window.removeEventListener('db-updated', loadData);
   }, []);
 
   const handleSubmit = (e: React.FormEvent) => {

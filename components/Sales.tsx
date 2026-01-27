@@ -34,10 +34,15 @@ const Sales: React.FC = () => {
     const [showCustomerList, setShowCustomerList] = useState(false);
 
     useEffect(() => {
-        setSales(db.sales.getAll().sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-        setProducts(db.inventory.getAll());
-        setCustomers(db.customers.getAll());
-        setStaff(db.staff.getAll());
+        const loadData = () => {
+            setSales(db.sales.getAll().sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+            setProducts(db.inventory.getAll());
+            setCustomers(db.customers.getAll());
+            setStaff(db.staff.getAll());
+        };
+        loadData();
+        window.addEventListener('db-updated', loadData);
+        return () => window.removeEventListener('db-updated', loadData);
     }, []);
 
     const addToCart = () => {

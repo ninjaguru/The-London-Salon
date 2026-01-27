@@ -243,20 +243,25 @@ export const setupRealtimeSync = () => {
   // 1. Listen to the main Vault for all tables
   const unsubVault = onSnapshot(collection(firestore, 'salon_vault'), (snapshot) => {
     snapshot.docChanges().forEach(async (change) => {
-      if (change.type === 'added' || change.type === 'modified') {
-        const tableName = change.doc.id;
+      const tableName = change.doc.id;
+      const dbKey = Object.keys(db).find(key => (db as any)[key].tableName === tableName);
 
-        // Skip Attendance here if we are listening to it directly
+      if (!dbKey) return;
+      const store = (db as any)[dbKey];
+
+      if (change.type === 'added' || change.type === 'modified') {
+        // Skip Attendance here as it's handled by its own collection
         if (tableName === 'Attendance') return;
 
         const cloudData = change.doc.data().data;
-        const dbKey = Object.keys(db).find(key => (db as any)[key].tableName === tableName);
-        if (dbKey && cloudData) {
-          const store = (db as any)[dbKey];
-          if (JSON.stringify(store.getAll()) !== JSON.stringify(cloudData)) {
-            store.overrideLocal(cloudData);
-          }
+        if (cloudData && JSON.stringify(store.getAll()) !== JSON.stringify(cloudData)) {
+          console.log(`Real-time sync: ${tableName} updated`);
+          store.overrideLocal(cloudData);
         }
+      } else if (change.type === 'removed') {
+        console.log(`Real-time sync: ${tableName} document removed from cloud`);
+        // If the table document is gone, we should probably reset local data to empty or initial
+        store.overrideLocal([]);
       }
     });
   }, (err) => console.warn('Vault listener error:', err));

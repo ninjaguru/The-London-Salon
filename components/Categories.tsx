@@ -18,7 +18,12 @@ const Categories: React.FC = () => {
   const [description, setDescription] = useState('');
 
   useEffect(() => {
-    setCategories(db.categories.getAll());
+    const loadCategories = () => {
+      setCategories(db.categories.getAll());
+    };
+    loadCategories();
+    window.addEventListener('db-updated', loadCategories);
+    return () => window.removeEventListener('db-updated', loadCategories);
   }, []);
 
   const handleSubmit = (e: React.FormEvent) => {

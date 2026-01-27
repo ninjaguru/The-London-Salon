@@ -51,9 +51,14 @@ const Customers: React.FC = () => {
     const pageSize = 20;
 
     useEffect(() => {
-        setCustomers(db.customers.getAll());
-        setPackages(db.packages.getAll());
-        setCoupons(db.couponTemplates.getAll());
+        const loadData = () => {
+            setCustomers(db.customers.getAll());
+            setPackages(db.packages.getAll());
+            setCoupons(db.couponTemplates.getAll());
+        };
+        loadData();
+        window.addEventListener('db-updated', loadData);
+        return () => window.removeEventListener('db-updated', loadData);
     }, []);
 
     const openModal = (customer?: Customer) => {

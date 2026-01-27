@@ -7,27 +7,29 @@ import { Sparkles, Phone, MapPin, Clock, Tag, Layers, Crown, ChevronRight } from
 const PublicMenu: React.FC = () => {
     const [activeGender, setActiveGender] = useState<GenderTarget | 'All'>('All');
     const [activeTab, setActiveTab] = useState<'Services' | 'Combos' | 'Packages'>('Services');
-    
+
     const [services, setServices] = useState<Service[]>([]);
     const [combos, setCombos] = useState<Combo[]>([]);
     const [packages, setPackages] = useState<Package[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
 
     useEffect(() => {
-        setServices(db.services.getAll());
-        setCombos(db.combos.getAll().filter(c => c.active));
-        setPackages(db.packages.getAll());
-        setCategories(db.categories.getAll());
-        
-        // Ensure we scroll to top on mount
-        window.scrollTo(0, 0);
+        const loadData = () => {
+            setServices(db.services.getAll());
+            setCombos(db.combos.getAll().filter(c => c.active));
+            setPackages(db.packages.getAll());
+            setCategories(db.categories.getAll());
+        };
+        loadData();
+        window.addEventListener('db-updated', loadData);
+        return () => window.removeEventListener('db-updated', loadData);
     }, []);
 
-    const filteredServices = services.filter(s => 
+    const filteredServices = services.filter(s =>
         (activeGender === 'All' || s.gender === activeGender || s.gender === 'Unisex')
     );
 
-    const filteredCombos = combos.filter(c => 
+    const filteredCombos = combos.filter(c =>
         (activeGender === 'All' || c.gender === activeGender || c.gender === 'Unisex')
     );
 
@@ -41,10 +43,10 @@ const PublicMenu: React.FC = () => {
         <div className="min-h-screen bg-white text-gray-900 pb-20">
             {/* Header Hero */}
             <div className="relative h-64 bg-gray-900 flex items-center justify-center overflow-hidden">
-                <img 
-                    src="https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&q=80&w=1200" 
-                    className="absolute inset-0 w-full h-full object-cover opacity-40" 
-                    alt="Salon Background" 
+                <img
+                    src="https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&q=80&w=1200"
+                    className="absolute inset-0 w-full h-full object-cover opacity-40"
+                    alt="Salon Background"
                 />
                 <div className="relative z-10 text-center px-4">
                     <img src="/logo.png" alt="The London Salon" className="h-24 w-auto mx-auto mb-4 brightness-0 invert" />
@@ -59,11 +61,10 @@ const PublicMenu: React.FC = () => {
                         <button
                             key={g}
                             onClick={() => setActiveGender(g as any)}
-                            className={`px-6 py-1.5 rounded-full text-sm font-bold transition-all ${
-                                activeGender === g 
-                                ? 'bg-rose-600 text-white shadow-md' 
-                                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                            }`}
+                            className={`px-6 py-1.5 rounded-full text-sm font-bold transition-all ${activeGender === g
+                                    ? 'bg-rose-600 text-white shadow-md'
+                                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                }`}
                         >
                             {g}
                         </button>
@@ -74,11 +75,10 @@ const PublicMenu: React.FC = () => {
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab as any)}
-                            className={`flex-1 py-3 text-sm font-bold border-b-2 transition-colors ${
-                                activeTab === tab 
-                                ? 'border-rose-600 text-rose-600' 
-                                : 'border-transparent text-gray-400'
-                            }`}
+                            className={`flex-1 py-3 text-sm font-bold border-b-2 transition-colors ${activeTab === tab
+                                    ? 'border-rose-600 text-rose-600'
+                                    : 'border-transparent text-gray-400'
+                                }`}
                         >
                             {tab}
                         </button>
@@ -202,15 +202,15 @@ const PublicMenu: React.FC = () => {
             {/* Footer Contact */}
             <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 z-40">
                 <div className="max-w-2xl mx-auto flex gap-3">
-                    <a 
-                        href="tel:+910000000000" 
+                    <a
+                        href="tel:+910000000000"
                         className="flex-1 bg-gray-900 text-white py-3 rounded-xl flex items-center justify-center font-bold gap-2 shadow-lg active:scale-95 transition-transform"
                     >
                         <Phone size={18} /> Call Now
                     </a>
-                    <a 
-                        href="https://maps.google.com" 
-                        target="_blank" 
+                    <a
+                        href="https://maps.google.com"
+                        target="_blank"
                         rel="noreferrer"
                         className="flex-1 bg-rose-600 text-white py-3 rounded-xl flex items-center justify-center font-bold gap-2 shadow-lg active:scale-95 transition-transform"
                     >

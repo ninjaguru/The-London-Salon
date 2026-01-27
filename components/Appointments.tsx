@@ -82,12 +82,17 @@ const Appointments: React.FC = () => {
     };
 
     useEffect(() => {
-        setAppointments(db.appointments.getAll());
-        setStaff(db.staff.getAll());
-        setCustomers(db.customers.getAll());
-        setServices(db.services.getAll());
-        setCombos(db.combos.getAll());
-        setCategories(db.categories.getAll());
+        const loadData = () => {
+            setAppointments(db.appointments.getAll());
+            setStaff(db.staff.getAll());
+            setCustomers(db.customers.getAll());
+            setServices(db.services.getAll());
+            setCombos(db.combos.getAll());
+            setCategories(db.categories.getAll());
+        };
+        loadData();
+        window.addEventListener('db-updated', loadData);
+        return () => window.removeEventListener('db-updated', loadData);
     }, []);
 
     const handleStatusChange = (id: string, newStatus: AppointmentStatus) => {
