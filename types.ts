@@ -21,6 +21,7 @@ export interface Staff {
   active: boolean;
   target?: number; // Monthly revenue target
   salary?: number; // Monthly salary
+  registeredDeviceId?: string; // ID of the device used for attendance (MAC address proxy)
 }
 
 export interface Category {
@@ -194,4 +195,5 @@ export interface Attendance {
   date: string; // YYYY-MM-DD
   loginTime: string; // ISO String
   logoutTime?: string; // ISO String
+  deviceId?: string; // ID of the device used for this scan
 }

@@ -14,6 +14,17 @@ const StaffAttendanceConfirm: React.FC = () => {
     const [status, setStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
+    const [deviceId, setDeviceId] = useState('');
+
+    // Device ID Management (Proxy for MAC Address)
+    useEffect(() => {
+        let id = localStorage.getItem('tls_device_id');
+        if (!id) {
+            id = `DEV-${crypto.randomUUID().slice(0, 8)}`;
+            localStorage.setItem('tls_device_id', id);
+        }
+        setDeviceId(id);
+    }, []);
 
     useEffect(() => {
         const staffIdParam = searchParams.get('staffId');
@@ -51,10 +62,36 @@ const StaffAttendanceConfirm: React.FC = () => {
     }, [searchParams]);
 
     const handleConfirm = () => {
-        if (!selectedStaff || !selectedAction) return;
+        if (!selectedStaff || !selectedAction || !deviceId) return;
 
         setLoading(true);
         const today = getTodayIST();
+
+        // Refresh staff list from DB to get latest registeredDeviceId
+        const allStaff = db.staff.getAll();
+        const dbStaff = allStaff.find(s => s.id === selectedStaff.id);
+
+        // DEVICE LOCK LOGIC
+        if (dbStaff) {
+            if (!dbStaff.registeredDeviceId) {
+                // First time: Register this device
+                const updatedStaff = allStaff.map(s =>
+                    s.id === dbStaff.id ? { ...s, registeredDeviceId: deviceId } : s
+                );
+                db.staff.save(updatedStaff);
+                console.log(`Registered device ${deviceId} for staff ${dbStaff.name}`);
+            } else if (dbStaff.registeredDeviceId !== deviceId) {
+                // Not the registered device
+                setStatus({
+                    type: 'error',
+                    message: `Device Mismatch! For security, attendance must be submitted from your registered device. Please contact management to reset your device link.`
+                });
+                setLoading(false);
+                setSuccess(true);
+                return;
+            }
+        }
+
         const allAttendance = db.attendance.getAll();
 
         if (selectedAction === 'login') {
@@ -64,7 +101,8 @@ const StaffAttendanceConfirm: React.FC = () => {
                 userId: selectedStaff.id,
                 userName: selectedStaff.name,
                 date: today,
-                loginTime: new Date().toISOString()
+                loginTime: new Date().toISOString(),
+                deviceId: deviceId
             };
             db.attendance.add(newEntry);
             setStatus({ type: 'success', message: `Punch In recorded! Have a great shift, ${selectedStaff.name}.` });
@@ -74,7 +112,7 @@ const StaffAttendanceConfirm: React.FC = () => {
 
             if (activeSession) {
                 const updated = allAttendance.map(a =>
-                    a.id === activeSession.id ? { ...a, logoutTime: new Date().toISOString() } : a
+                    a.id === activeSession.id ? { ...a, logoutTime: new Date().toISOString(), deviceId: deviceId } : a
                 );
                 db.attendance.save(updated);
             } else {
@@ -85,7 +123,8 @@ const StaffAttendanceConfirm: React.FC = () => {
                     userName: selectedStaff.name,
                     date: today,
                     loginTime: new Date().toISOString(), // Fallback login time
-                    logoutTime: new Date().toISOString()
+                    logoutTime: new Date().toISOString(),
+                    deviceId: deviceId
                 };
                 db.attendance.add(newEntry);
             }

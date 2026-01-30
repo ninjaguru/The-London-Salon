@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { db, exportToCSV } from '../services/db';
 import { authService } from '../services/auth';
 import { Staff as StaffType, Role, AppointmentStatus, Appointment } from '../types';
-import { Plus, Edit2, Trash2, CheckCircle, XCircle, Download, Target, DollarSign, QrCode, Printer, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, CheckCircle, XCircle, Download, Target, DollarSign, QrCode, Printer, X, Smartphone, RefreshCw } from 'lucide-react';
 import Modal from './ui/Modal';
 
 const Staff: React.FC = () => {
@@ -65,6 +65,15 @@ const Staff: React.FC = () => {
     setStaffList(newList);
     db.staff.save(newList);
     closeModal();
+  };
+
+  const handleResetDevice = (id: string, name: string) => {
+    if (!isAdmin) return;
+    if (confirm(`Are you sure you want to reset the device link for ${name}? This will allow them to register a new phone on their next scan.`)) {
+      const newList = staffList.map(s => s.id === id ? { ...s, registeredDeviceId: undefined } : s);
+      setStaffList(newList);
+      db.staff.save(newList);
+    }
   };
 
   const handleDelete = (id: string) => {
@@ -215,11 +224,21 @@ const Staff: React.FC = () => {
                     </>
                   )}
                 </div>
-                <div>
+                <div className="flex items-center gap-3">
                   {staff.active ?
                     <span className="flex items-center text-green-600 text-xs font-medium"><CheckCircle size={14} className="mr-1" /> Active</span> :
                     <span className="flex items-center text-red-500 text-xs font-medium"><XCircle size={14} className="mr-1" /> Inactive</span>
                   }
+
+                  {isAdmin && staff.registeredDeviceId && (
+                    <button
+                      onClick={() => handleResetDevice(staff.id, staff.name)}
+                      className="flex items-center bg-amber-50 text-amber-700 px-2 py-0.5 rounded border border-amber-200 text-[10px] font-bold hover:bg-amber-100 transition-colors"
+                      title={`Device ID: ${staff.registeredDeviceId}`}
+                    >
+                      <Smartphone size={10} className="mr-1" /> Device Linked (Reset)
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
