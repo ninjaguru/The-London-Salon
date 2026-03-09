@@ -5,7 +5,7 @@ import { db } from '../services/db';
 import { Staff } from '../types';
 import { Clock, ArrowLeft, LogIn, LogOut, CheckCircle2 } from 'lucide-react';
 import { firebaseService, getFirebaseDb } from '../services/firebase';
-import { collection, query, where, onSnapshot, limit, orderBy } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 const StaffAttendanceTerminal: React.FC = () => {
     const navigate = useNavigate();
@@ -35,36 +35,34 @@ const StaffAttendanceTerminal: React.FC = () => {
     useEffect(() => {
         if (step !== 'qr' || !selectedStaff || !selectedAction) return;
 
-        const db = getFirebaseDb();
-        if (!db) return;
+        const firebaseDb = getFirebaseDb();
+        if (!firebaseDb) return;
 
-        // Listen for new attendance logs - simplified to avoid index requirement
-        const q = query(
-            collection(db, 'salon_attendance'),
-            orderBy('updatedAt', 'desc'),
-            limit(5)
-        );
+        // Listen for updates to the Attendance document in salon_vault
+        const docRef = doc(firebaseDb, 'salon_vault', 'Attendance');
 
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            snapshot.docChanges().forEach((change) => {
-                if (change.type === 'added' || change.type === 'modified') {
-                    const data = change.doc.data();
+        const unsubscribe = onSnapshot(docRef, (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                const logs = data.data || [];
+                const lastUpdate = data.updatedAt;
 
-                    // Filter for our selected staff
-                    if (data.userId === selectedStaff.id) {
-                        const actionTime = new Date(data.updatedAt).getTime();
-                        const now = Date.now();
+                // Check if the most recent log entry matches our selected staff
+                const latestLog = logs[0]; // StorageService.add prepends items
 
-                        // If the change happened in the last 60 seconds, it's likely our scan
-                        if (now - actionTime < 60000) {
-                            setIsSuccess(true);
-                            setTimeout(() => {
-                                reset();
-                            }, 3000); // Back to start after 3 seconds
-                        }
+                if (latestLog && latestLog.userId === selectedStaff.id) {
+                    const actionTime = new Date(lastUpdate).getTime();
+                    const now = Date.now();
+
+                    // If the change happened in the last 60 seconds, it's our scan
+                    if (now - actionTime < 60000) {
+                        setIsSuccess(true);
+                        setTimeout(() => {
+                            reset();
+                        }, 3000); // Back to start after 3 seconds
                     }
                 }
-            });
+            }
         });
 
         return () => unsubscribe();

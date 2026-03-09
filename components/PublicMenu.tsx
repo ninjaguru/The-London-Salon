@@ -62,8 +62,8 @@ const PublicMenu: React.FC = () => {
                             key={g}
                             onClick={() => setActiveGender(g as any)}
                             className={`px-6 py-1.5 rounded-full text-sm font-bold transition-all ${activeGender === g
-                                    ? 'bg-rose-600 text-white shadow-md'
-                                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                ? 'bg-rose-600 text-white shadow-md'
+                                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                                 }`}
                         >
                             {g}
@@ -76,8 +76,8 @@ const PublicMenu: React.FC = () => {
                             key={tab}
                             onClick={() => setActiveTab(tab as any)}
                             className={`flex-1 py-3 text-sm font-bold border-b-2 transition-colors ${activeTab === tab
-                                    ? 'border-rose-600 text-rose-600'
-                                    : 'border-transparent text-gray-400'
+                                ? 'border-rose-600 text-rose-600'
+                                : 'border-transparent text-gray-400'
                                 }`}
                         >
                             {tab}
@@ -203,13 +203,13 @@ const PublicMenu: React.FC = () => {
             <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 z-40">
                 <div className="max-w-2xl mx-auto flex gap-3">
                     <a
-                        href="tel:+910000000000"
+                        href="tel:+919916102266"
                         className="flex-1 bg-gray-900 text-white py-3 rounded-xl flex items-center justify-center font-bold gap-2 shadow-lg active:scale-95 transition-transform"
                     >
                         <Phone size={18} /> Call Now
                     </a>
                     <a
-                        href="https://maps.google.com"
+                        href="https://maps.app.goo.gl/vZsEimZUYHSoDijq5"
                         target="_blank"
                         rel="noreferrer"
                         className="flex-1 bg-rose-600 text-white py-3 rounded-xl flex items-center justify-center font-bold gap-2 shadow-lg active:scale-95 transition-transform"

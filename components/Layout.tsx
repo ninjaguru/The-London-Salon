@@ -11,6 +11,7 @@ import {
   Menu,
   X,
   Crown,
+  Gift,
   BarChart2,
   Bell,
   Tags,
@@ -201,6 +202,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { to: '/coupons', icon: TicketPercent, label: 'Coupons' },
     { to: '/sales', icon: CreditCard, label: 'Product Sales' },
     { to: '/packages', icon: Crown, label: 'Packages' },
+    { to: '/referrals', icon: Gift, label: 'Referral Program' },
     { to: '/assistant', icon: Sparkles, label: 'Smart Assistant', highlight: true },
   ];
 

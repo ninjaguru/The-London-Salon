@@ -1,7 +1,7 @@
 
 import {
   Staff, Product, Customer, Appointment, Sale, Package, Notification, Category, Service, Lead, CouponTemplate, Combo, Attendance,
-  Role, AppointmentStatus
+  Role, AppointmentStatus, ReferralReward
 } from '../types';
 import { firebaseService, getFirebaseDb } from './firebase';
 import { doc, setDoc, getDocs, collection, onSnapshot } from 'firebase/firestore';
@@ -21,6 +21,15 @@ export const generateId = (): string => {
   return Math.random().toString(36).substring(2) + Date.now().toString(36);
 };
 
+// Helper: Generate Referral Code
+export const generateReferralCode = (name: any, phone: any): string => {
+  const safeName = String(name || 'USER').replace(/\s+/g, '').toUpperCase();
+  const safePhone = String(phone || '0000').replace(/\D/g, '');
+  const prefix = safeName.substring(0, 4).padEnd(4, 'X');
+  const suffix = safePhone.slice(-4).padStart(4, '0');
+  return `${prefix}${suffix}`;
+};
+
 // Initial Empty Data
 const INITIAL_STAFF: Staff[] = [];
 const INITIAL_CATEGORIES: Category[] = [];
@@ -35,11 +44,12 @@ const INITIAL_SALES: Sale[] = [];
 const INITIAL_NOTIFICATIONS: Notification[] = [];
 const INITIAL_COUPON_TEMPLATES: CouponTemplate[] = [];
 const INITIAL_ATTENDANCE: Attendance[] = [];
+const INITIAL_REFERRAL_REWARDS: ReferralReward[] = [];
 
 class StorageService<T> {
   private key: string;
   private initialData: T[];
-  private tableName: string; // For Google Sheets mapping
+  public tableName: string; // For Google Sheets mapping
 
   constructor(key: string, initialData: T[], tableName: string) {
     this.key = key;
@@ -81,24 +91,6 @@ class StorageService<T> {
             if (userJson) userName = JSON.parse(userJson).name;
           } catch (e) { }
 
-          // Special handling for Attendance: Save individual entry to shared collection
-          // This prevents different staff phones from overwriting each other's logs
-          if (this.tableName === 'Attendance' && data.length > 0) {
-            // Find the most recently active entry (latest login or logout)
-            const sorted = [...(data as any)].sort((a, b) => {
-              const timeA = new Date(a.logoutTime || a.loginTime).getTime();
-              const timeB = new Date(b.logoutTime || b.loginTime).getTime();
-              return timeB - timeA;
-            });
-
-            const lastItem = sorted[0];
-            if (lastItem && lastItem.id) {
-              setDoc(doc(firestore, 'salon_attendance', lastItem.id), {
-                ...lastItem,
-                updatedAt: new Date().toISOString()
-              }).then(() => console.log('Synced individual attendance entry:', lastItem.userName));
-            }
-          }
 
           setDoc(doc(firestore, 'salon_vault', this.tableName), {
             data,
@@ -131,21 +123,22 @@ class StorageService<T> {
   }
 }
 
-// Storage Keys - Updated to v6 to clear previous bad data/cache
+// Storage Keys - Updated to v7 to clear previous bad data/cache
 export const db = {
-  staff: new StorageService<Staff>('salon_staff_v6', INITIAL_STAFF, 'Staff'),
-  categories: new StorageService<Category>('salon_categories_v6', INITIAL_CATEGORIES, 'Categories'),
-  services: new StorageService<Service>('salon_services_v6', INITIAL_SERVICES, 'Services'),
-  combos: new StorageService<Combo>('salon_combos_v6', INITIAL_COMBOS, 'Combos'),
-  inventory: new StorageService<Product>('salon_inventory_v6', INITIAL_PRODUCTS, 'Inventory'),
-  packages: new StorageService<Package>('salon_packages_v6', INITIAL_PACKAGES, 'Packages'),
-  customers: new StorageService<Customer>('salon_customers_v6', INITIAL_CUSTOMERS, 'Customers'),
-  leads: new StorageService<Lead>('salon_leads_v6', INITIAL_LEADS, 'Leads'),
-  appointments: new StorageService<Appointment>('salon_appointments_v6', INITIAL_APPOINTMENTS, 'Appointments'),
-  sales: new StorageService<Sale>('salon_sales_v6', INITIAL_SALES, 'Sales'),
-  notifications: new StorageService<Notification>('salon_notifications_v6', INITIAL_NOTIFICATIONS, 'Notifications'),
-  couponTemplates: new StorageService<CouponTemplate>('salon_coupon_templates_v6', INITIAL_COUPON_TEMPLATES, 'CouponTemplates'),
-  attendance: new StorageService<Attendance>('salon_attendance_v6', INITIAL_ATTENDANCE, 'Attendance')
+  staff: new StorageService<Staff>('salon_staff_v7', INITIAL_STAFF, 'Staff'),
+  categories: new StorageService<Category>('salon_categories_v7', INITIAL_CATEGORIES, 'Categories'),
+  services: new StorageService<Service>('salon_services_v7', INITIAL_SERVICES, 'Services'),
+  combos: new StorageService<Combo>('salon_combos_v7', INITIAL_COMBOS, 'Combos'),
+  inventory: new StorageService<Product>('salon_inventory_v7', INITIAL_PRODUCTS, 'Inventory'),
+  packages: new StorageService<Package>('salon_packages_v7', INITIAL_PACKAGES, 'Packages'),
+  customers: new StorageService<Customer>('salon_customers_v7', INITIAL_CUSTOMERS, 'Customers'),
+  leads: new StorageService<Lead>('salon_leads_v7', INITIAL_LEADS, 'Leads'),
+  appointments: new StorageService<Appointment>('salon_appointments_v7', INITIAL_APPOINTMENTS, 'Appointments'),
+  sales: new StorageService<Sale>('salon_sales_v7', INITIAL_SALES, 'Sales'),
+  notifications: new StorageService<Notification>('salon_notifications_v7', INITIAL_NOTIFICATIONS, 'Notifications'),
+  couponTemplates: new StorageService<CouponTemplate>('salon_coupon_templates_v7', INITIAL_COUPON_TEMPLATES, 'CouponTemplates'),
+  attendance: new StorageService<Attendance>('salon_attendance_v7', INITIAL_ATTENDANCE, 'Attendance'),
+  referralRewards: new StorageService<ReferralReward>('salon_referral_rewards_v7', INITIAL_REFERRAL_REWARDS, 'ReferralRewards')
 };
 
 export const createNotification = (type: Notification['type'], title: string, message: string, relatedId?: string) => {
@@ -204,17 +197,6 @@ export const syncFromCloud = async () => {
         const tableName = docSnap.id;
         let cloudData = docSnap.data().data;
 
-        // Special handling for Attendance: Always fetch and merge individual logs
-        if (tableName === 'Attendance') {
-          try {
-            const logsSnap = await getDocs(collection(firestore, 'salon_attendance'));
-            const allLogs = logsSnap.docs.map(d => d.data() as Attendance);
-            cloudData = allLogs.sort((a, b) => new Date(b.loginTime).getTime() - new Date(a.loginTime).getTime());
-          } catch (e) {
-            console.warn('Failed to fetch individual attendance logs during sync', e);
-          }
-        }
-
         const dbKey = Object.keys(db).find(key => (db as any)[key].tableName === tableName);
         if (dbKey && cloudData) {
           (db as any)[dbKey].overrideLocal(cloudData);
@@ -250,8 +232,6 @@ export const setupRealtimeSync = () => {
       const store = (db as any)[dbKey];
 
       if (change.type === 'added' || change.type === 'modified') {
-        // Skip Attendance here as it's handled by its own collection
-        if (tableName === 'Attendance') return;
 
         const cloudData = change.doc.data().data;
         if (cloudData && JSON.stringify(store.getAll()) !== JSON.stringify(cloudData)) {
@@ -267,18 +247,6 @@ export const setupRealtimeSync = () => {
   }, (err) => console.warn('Vault listener error:', err));
   unsubscribers.push(unsubVault);
 
-  // 2. Direct listener for Attendance logs (Individual documents)
-  const unsubAttendance = onSnapshot(collection(firestore, 'salon_attendance'), (snapshot) => {
-    const allLogs = snapshot.docs.map(d => d.data() as Attendance);
-    const sortedLogs = allLogs.sort((a, b) => new Date(b.loginTime).getTime() - new Date(a.loginTime).getTime());
-
-    const localLogs = db.attendance.getAll();
-    if (JSON.stringify(localLogs) !== JSON.stringify(sortedLogs)) {
-      console.log('Real-time sync: Received new attendance records');
-      db.attendance.overrideLocal(sortedLogs);
-    }
-  }, (err) => console.warn('Attendance listener error (check rules):', err));
-  unsubscribers.push(unsubAttendance);
 
   return () => unsubscribers.forEach(unsub => unsub());
 };

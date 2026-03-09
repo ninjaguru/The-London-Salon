@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { db, exportToCSV, getTodayIST } from '../services/db';
+import { db, exportToCSV, getTodayIST, generateReferralCode } from '../services/db';
 import { authService } from '../services/auth';
 import { Customer, Package, Sale, CouponTemplate, CustomerCoupon } from '../types';
 import { Plus, Search, Mail, Phone, User, Download, Home, Cake, Heart, Wallet, CreditCard, Gift, Clock, AlertCircle, Crown, History, TicketPercent, CheckCircle, Star, Upload, MessageCircle } from 'lucide-react';
@@ -33,7 +33,8 @@ const Customers: React.FC = () => {
 
     // Form
     const [formData, setFormData] = useState({
-        name: '', email: '', phone: '', apartment: ''
+        name: '', email: '', phone: '', apartment: '',
+        referredByCode: '' // New referral field
     });
 
     // Date State for custom Month/Day selectors
@@ -52,7 +53,22 @@ const Customers: React.FC = () => {
 
     useEffect(() => {
         const loadData = () => {
-            setCustomers(db.customers.getAll());
+            const allCustomers = db.customers.getAll();
+            let needsUpdate = false;
+
+            const updatedCustomers = allCustomers.map(c => {
+                if (!c.referralCode) {
+                    needsUpdate = true;
+                    return { ...c, referralCode: generateReferralCode(c.name, c.phone), referralCount: c.referralCount || 0 };
+                }
+                return c;
+            });
+
+            if (needsUpdate) {
+                db.customers.save(updatedCustomers);
+            }
+
+            setCustomers(updatedCustomers);
             setPackages(db.packages.getAll());
             setCoupons(db.couponTemplates.getAll());
         };
@@ -69,6 +85,7 @@ const Customers: React.FC = () => {
                 email: customer.email,
                 phone: customer.phone,
                 apartment: customer.apartment,
+                referredByCode: ''
             });
 
             // Parse Birthday
@@ -93,7 +110,7 @@ const Customers: React.FC = () => {
 
         } else {
             setEditingCustomer(null);
-            setFormData({ name: '', email: '', phone: '', apartment: '' });
+            setFormData({ name: '', email: '', phone: '', apartment: '', referredByCode: '' });
             setBDay('');
             setBMonth('');
             setADay('');
@@ -114,6 +131,7 @@ const Customers: React.FC = () => {
         setSelectedCouponTemplateId('');
         setIsCouponModalOpen(true);
     };
+
 
     const openHistoryModal = (customer: Customer) => {
         setHistoryCustomer(customer);
@@ -152,16 +170,62 @@ const Customers: React.FC = () => {
 
         if (editingCustomer) {
             updated = customers.map(c => c.id === editingCustomer.id ? {
-                ...c, ...finalData
+                ...c,
+                name: finalData.name,
+                email: finalData.email,
+                phone: finalData.phone,
+                apartment: finalData.apartment,
+                birthday: finalData.birthday,
+                anniversary: finalData.anniversary
             } : c);
         } else {
+            // Check Referral
+            let referredById = undefined;
+            if (formData.referredByCode) {
+                const referrer = customers.find(c => c.referralCode === formData.referredByCode.toUpperCase());
+                if (referrer) {
+                    referredById = referrer.id;
+
+                    // Increment referral count for referrer
+                    const updatedReferrer = { ...referrer, referralCount: (referrer.referralCount || 0) + 1 };
+
+                    // Check for Rewards
+                    const rewards = db.referralRewards.getAll();
+                    const eligibleReward = rewards.find(r => r.referralThreshold === updatedReferrer.referralCount);
+
+                    if (eligibleReward) {
+                        const newCoupon: CustomerCoupon = {
+                            id: crypto.randomUUID(),
+                            templateId: 'REFERRAL_REWARD', // Virtual template
+                            name: `Referral Reward: ${eligibleReward.rewardText}`,
+                            code: `REF-${updatedReferrer.referralCount}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+                            description: eligibleReward.rewardText,
+                            assignedDate: new Date().toISOString(),
+                            expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // Default 30 days
+                            isRedeemed: false
+                        };
+                        updatedReferrer.activeCoupons = [...(updatedReferrer.activeCoupons || []), newCoupon];
+                    }
+
+                    db.customers.save(customers.map(c => c.id === referrer.id ? updatedReferrer : c));
+                }
+            }
+
             const newCustomer: Customer = {
                 id: crypto.randomUUID(),
-                ...finalData,
+                name: finalData.name,
+                email: finalData.email,
+                phone: finalData.phone,
+                apartment: finalData.apartment,
+                birthday: finalData.birthday,
+                anniversary: finalData.anniversary,
                 walletBalance: 0,
-                isMember: false,
                 joinDate: getTodayIST(),
-                activeCoupons: []
+                isMember: false,
+                activeCoupons: [],
+                referralCode: generateReferralCode(finalData.name, finalData.phone),
+                referralCount: 0,
+                referredById: referredById
             };
             updated = [...customers, newCustomer];
         }
@@ -335,7 +399,9 @@ const Customers: React.FC = () => {
                             walletBalance: 0,
                             joinDate: getTodayIST(),
                             isMember: false,
-                            activeCoupons: []
+                            activeCoupons: [],
+                            referralCode: generateReferralCode(rawName, rawPhone),
+                            referralCount: 0
                         });
                         existingPhones.add(cleanPhone); // Add to set to catch duplicates within the file too
                         addedCount++;
@@ -552,6 +618,17 @@ const Customers: React.FC = () => {
                                                 >
                                                     Edit
                                                 </button>
+                                                <div className="mt-1 flex items-center gap-1">
+                                                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">CODE:</span>
+                                                    <span className="text-[10px] bg-rose-50 text-rose-600 px-1 rounded font-mono font-bold">
+                                                        {customer.referralCode}
+                                                    </span>
+                                                    {customer.referralCount > 0 && (
+                                                        <span className="text-[10px] bg-blue-50 text-blue-600 px-1 rounded font-bold">
+                                                            {customer.referralCount} REFERRED
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -619,7 +696,8 @@ const Customers: React.FC = () => {
                                                     e.stopPropagation();
                                                     const cleanPhone = customer.phone.replace(/\D/g, '');
                                                     const phoneWithCountry = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
-                                                    window.open(`https://web.whatsapp.com/send?phone=${phoneWithCountry}`, 'whatsapp_tab');
+                                                    const message = encodeURIComponent(`Hello ${customer.name}! This is The London Salon. How can we help you today?`);
+                                                    window.open(`https://web.whatsapp.com/send?phone=${phoneWithCountry}&text=${message}`, 'whatsapp_tab');
                                                 }}
                                                 className="p-1.5 bg-green-50 text-green-600 rounded-md hover:bg-green-100 border border-green-100 transition-colors"
                                                 title="WhatsApp Chat"
@@ -714,7 +792,8 @@ const Customers: React.FC = () => {
                                                     e.stopPropagation();
                                                     const cleanPhone = customer.phone.replace(/\D/g, '');
                                                     const phoneWithCountry = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
-                                                    window.open(`https://web.whatsapp.com/send?phone=${phoneWithCountry}`, 'whatsapp_tab');
+                                                    const message = encodeURIComponent(`Hello ${customer.name}! This is message regarding your upcoming event...`);
+                                                    window.open(`https://web.whatsapp.com/send?phone=${phoneWithCountry}&text=${message}`, 'whatsapp_tab');
                                                 }}
                                                 className="text-green-600 hover:text-green-700 flex items-center gap-1 font-medium"
                                             >
@@ -762,6 +841,20 @@ const Customers: React.FC = () => {
                         <label className="block text-sm font-medium text-gray-700">Apartment Name / Address</label>
                         <input type="text" value={formData.apartment} onChange={e => setFormData({ ...formData, apartment: e.target.value })} className="mt-1 block w-full border p-2 rounded-md border-gray-300" />
                     </div>
+
+                    {!editingCustomer && (
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Referral Code (Optional)</label>
+                            <input
+                                type="text"
+                                placeholder="e.g. SAMA1234"
+                                value={formData.referredByCode}
+                                onChange={e => setFormData({ ...formData, referredByCode: e.target.value.toUpperCase() })}
+                                className="mt-1 block w-full border p-2 rounded-md border-gray-300 placeholder:text-gray-300 uppercase font-mono"
+                            />
+                            <p className="text-[10px] text-gray-400 mt-1 uppercase font-bold">Ask the client if they were referred by a friend</p>
+                        </div>
+                    )}
 
                     {/* Birthday Select */}
                     <div>

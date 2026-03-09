@@ -23,6 +23,7 @@ import PublicMenu from './components/PublicMenu';
 import Attendance from './components/Attendance';
 import StaffAttendanceTerminal from './components/StaffAttendanceTerminal';
 import StaffAttendanceConfirm from './components/StaffAttendanceConfirm';
+import ReferralRewards from './components/ReferralRewards';
 import { authService } from './services/auth';
 
 // Guard component to check if user is logged in
@@ -60,6 +61,7 @@ const App: React.FC = () => {
         <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
         <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
         <Route path="/assistant" element={<ProtectedRoute><AIAssistant /></ProtectedRoute>} />
+        <Route path="/referrals" element={<ProtectedRoute><ReferralRewards /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
 
         <Route path="*" element={<Navigate to="/" replace />} />

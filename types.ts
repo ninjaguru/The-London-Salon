@@ -105,6 +105,17 @@ export interface Customer {
   joinDate: string;
   notes?: string;
   activeCoupons: CustomerCoupon[];
+
+  // Referrals
+  referralCode: string;
+  referralCount: number;
+  referredById?: string; // ID of the customer who referred this person
+}
+
+export interface ReferralReward {
+  id: string;
+  referralThreshold: number; // e.g. 3, 5, 10
+  rewardText: string; // Plain text description (e.g. "Free Haircut")
 }
 
 export enum AppointmentStatus {
