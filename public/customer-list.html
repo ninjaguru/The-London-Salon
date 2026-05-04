@@ -184,7 +184,7 @@
 <script type="module">
     // Firebase SDK from CDN
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     async function loadData() {
         const tableBody = document.getElementById('tableBody');
@@ -243,10 +243,37 @@
         `).join('');
     }
 
-    window.clearData = function() {
-        if(confirm("Are you sure you want to delete all LOCAL submissions? Cloud data must be managed via the main dashboard.")) {
-            localStorage.removeItem('salon_customers_v7');
-            loadData();
+    window.clearData = async function() {
+        if(confirm("Are you sure you want to delete ALL submissions from the cloud? This action cannot be undone.")) {
+            try {
+                const configStr = localStorage.getItem('salon_firebase_config');
+                if (configStr) {
+                    const config = JSON.parse(configStr);
+                    const app = initializeApp(config);
+                    const db = getFirestore(app);
+                    
+                    // Reset the Submissions document in Firebase
+                    const docRef = doc(db, 'salon_vault', 'Submissions');
+                    await setDoc(docRef, {
+                        data: [],
+                        updatedAt: new Date().toISOString(),
+                        updatedBy: 'Customer-List-Clear'
+                    });
+                    
+                    // Also clear local redundancy
+                    localStorage.removeItem('salon_customers_v7');
+                    
+                    alert("All submissions cleared from cloud and local storage.");
+                    loadData();
+                } else {
+                    alert("Firebase not configured. Could only clear local data.");
+                    localStorage.removeItem('salon_customers_v7');
+                    loadData();
+                }
+            } catch (error) {
+                console.error("Clear failed:", error);
+                alert("Failed to clear cloud data. Check console for errors.");
+            }
         }
     }
 
