@@ -227,6 +227,17 @@
         return `${safeName.substring(0, 4).padEnd(4, 'X')}${safePhone.slice(-4).padStart(4, '0')}`;
     };
 
+    // Hardcoded Firebase Config for public access
+    const firebaseConfig = {
+        apiKey: "AIzaSyBhBP-fOxGbDhML-uwdiogg64edbXa2GJ4",
+        authDomain: "the-london-salon-ninja.firebaseapp.com",
+        projectId: "the-london-salon-ninja",
+        storageBucket: "the-london-salon-ninja.firebasestorage.app",
+        messagingSenderId: "654274787986",
+        appId: "1:654274787986:web:43f65b95defb139d1b044b",
+        measurementId: "G-Z66KMYQ32X"
+    };
+
     document.getElementById('customerForm').addEventListener('submit', async function(e) {
         e.preventDefault();
         
@@ -256,16 +267,13 @@
         localCustomers.push(newCustomer);
         localStorage.setItem('salon_customers_v7', JSON.stringify(localCustomers));
 
-        // 2. Sync to Firebase if configured
+        // 2. Sync to Firebase
         try {
-            const configStr = localStorage.getItem('salon_firebase_config');
-            if (configStr) {
-                const config = JSON.parse(configStr);
-                const app = initializeApp(config);
-                const db = getFirestore(app);
-                
-                const docRef = doc(db, 'salon_vault', 'Submissions');
-                const docSnap = await getDoc(docRef);
+            const app = initializeApp(firebaseConfig);
+            const db = getFirestore(app);
+            
+            const docRef = doc(db, 'salon_vault', 'Submissions');
+            const docSnap = await getDoc(docRef);
                 
                 let submissionsList = [];
                 if (docSnap.exists()) {
