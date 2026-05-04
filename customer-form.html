@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Information</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #219ebc;
+            --primary-dark: #126782;
+            --secondary: #8ecae6;
+            --bg-color: #f1f5f9;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: var(--text-main);
+            background-image: radial-gradient(circle at top right, #e0f2fe, #f1f5f9 40%);
+        }
+
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 24px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0,0,0,0.05);
+            width: 100%;
+            max-width: 400px;
+            position: relative;
+            overflow: hidden;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 6px;
+            background: linear-gradient(90deg, var(--secondary), var(--primary));
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            margin: 0 0 10px;
+            font-size: 26px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .header p {
+            margin: 0;
+            font-size: 14px;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 15px;
+            font-family: inherit;
+            color: var(--text-main);
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+            background-color: #f8fafc;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(33, 158, 188, 0.1);
+            background-color: white;
+        }
+
+        .form-control::placeholder {
+            color: #94a3b8;
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 14px;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        .btn-submit:hover {
+            background-color: var(--primary-dark);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(33, 158, 188, 0.2);
+        }
+
+        .btn-submit:active {
+            transform: translateY(0);
+        }
+
+        .success-message {
+            display: none;
+            text-align: center;
+            padding: 30px 20px;
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        .success-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+            color: #10b981;
+        }
+
+        .success-message h2 {
+            margin: 0 0 10px;
+            font-size: 22px;
+            color: var(--text-main);
+        }
+
+        .success-message p {
+            margin: 0;
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header" id="formHeader">
+        <h1>Welcome! 👋</h1>
+        <p>Please enter your details below so we can serve you better.</p>
+    </div>
+
+    <form id="customerForm">
+        <div class="form-group">
+            <label for="customerName">Full Name</label>
+            <input type="text" id="customerName" name="customerName" class="form-control" placeholder="e.g. Jane Doe" autocomplete="name" required>
+        </div>
+
+        <div class="form-group">
+            <label for="phoneNumber">Phone Number</label>
+            <input type="tel" id="phoneNumber" name="phoneNumber" class="form-control" placeholder="e.g. +91 98765 43210" autocomplete="tel" required>
+        </div>
+
+        <div class="form-group">
+            <label for="apartmentName">Apartment Name</label>
+            <!-- Datalist provides auto-fill suggestions as the user types -->
+            <input type="text" id="apartmentName" name="apartmentName" list="apartments" class="form-control" placeholder="Start typing apartment name..." autocomplete="organization" required>
+            <datalist id="apartments">
+                <!-- You can add more local apartment names here for auto-complete -->
+                <option value="Prestige Shantiniketan">
+                <option value="Brigade Metropolis">
+                <option value="Sobha City">
+                <option value="Salarpuria Sattva">
+                <option value="Rohan Jharoka">
+                <option value="Purva Riviera">
+                <option value="DivyaSree Republic of Whitefield">
+                <option value="Sumadhura Silver Ripples">
+                <option value="Alembic Urban Forest">
+            </datalist>
+        </div>
+
+        <button type="submit" class="btn-submit">Submit Details</button>
+    </form>
+
+    <div class="success-message" id="successMessage">
+        <div class="success-icon">✨</div>
+        <h2>Thank You!</h2>
+        <p>Your details have been submitted successfully.</p>
+    </div>
+</div>
+
+<script>
+    document.getElementById('customerForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // Create customer object
+        const newCustomer = {
+            id: Date.now(),
+            name: document.getElementById('customerName').value,
+            phone: document.getElementById('phoneNumber').value,
+            apartment: document.getElementById('apartmentName').value,
+            date: new Date().toLocaleString()
+        };
+        
+        // Save to browser's localStorage
+        let customers = JSON.parse(localStorage.getItem('customers')) || [];
+        customers.push(newCustomer);
+        localStorage.setItem('customers', JSON.stringify(customers));
+        
+        // Hide form and show success message
+        this.style.display = 'none';
+        document.getElementById('formHeader').style.display = 'none';
+        document.getElementById('successMessage').style.display = 'block';
+
+        // Add helpful links after submission
+        const successDiv = document.getElementById('successMessage');
+        if (!document.getElementById('actionLinks')) {
+            const actionLinks = document.createElement('div');
+            actionLinks.id = 'actionLinks';
+            actionLinks.style.marginTop = '25px';
+            actionLinks.innerHTML = `
+                <a href="customer-list.html" style="display: block; margin-bottom: 15px; background: var(--primary); color: white; text-decoration: none; padding: 10px 15px; border-radius: 8px; font-weight: 600;">View Submissions</a>
+                <a href="#" onclick="location.reload()" style="color: var(--text-muted); text-decoration: none; font-size: 14px; border-bottom: 1px solid currentColor;">Submit Another</a>
+            `;
+            successDiv.appendChild(actionLinks);
+        }
+    });
+</script>
+
+</body>
+</html>

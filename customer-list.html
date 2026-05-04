@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Submissions</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #219ebc;
+            --primary-light: #e0f2fe;
+            --bg-color: #f8fafc;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 40px 20px;
+            color: var(--text-main);
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .header p {
+            margin: 8px 0 0;
+            color: var(--text-muted);
+        }
+
+        .btn {
+            background-color: white;
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.2s;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn:hover {
+            background-color: var(--bg-color);
+            border-color: #cbd5e1;
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .btn-primary:hover {
+            background-color: #126782;
+            border-color: #126782;
+        }
+
+        .table-container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f8fafc;
+            padding: 16px 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        td {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 14px;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background-color: #f1f5f9;
+        }
+
+        .name-cell {
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            background-color: var(--primary-light);
+            color: var(--primary);
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+
+        .empty-state h3 {
+            margin: 0 0 10px;
+            color: var(--text-main);
+        }
+
+        .actions {
+            display: flex;
+            gap: 12px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <div>
+            <h1>Customer Directory</h1>
+            <p>A list of all customers who submitted their details.</p>
+        </div>
+        <div class="actions">
+            <button onclick="clearData()" class="btn">Clear Data</button>
+            <a href="customer-form.html" class="btn btn-primary">+ Add New</a>
+        </div>
+    </div>
+
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Phone Number</th>
+                    <th>Apartment Name</th>
+                    <th>Submission Date</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                <!-- Data will be injected here via JS -->
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    function loadData() {
+        const tableBody = document.getElementById('tableBody');
+        const customers = JSON.parse(localStorage.getItem('customers')) || [];
+        
+        if (customers.length === 0) {
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="4">
+                        <div class="empty-state">
+                            <h3>No submissions yet</h3>
+                            <p>Once a customer fills out the form, their details will appear here.</p>
+                        </div>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        // Sort by newest first
+        customers.sort((a, b) => b.id - a.id);
+
+        tableBody.innerHTML = customers.map(c => `
+            <tr>
+                <td class="name-cell">${c.name}</td>
+                <td>${c.phone}</td>
+                <td><span class="badge">${c.apartment}</span></td>
+                <td style="color: var(--text-muted); font-size: 13px;">${c.date}</td>
+            </tr>
+        `).join('');
+    }
+
+    function clearData() {
+        if(confirm("Are you sure you want to delete all submissions?")) {
+            localStorage.removeItem('customers');
+            loadData();
+        }
+    }
+
+    // Load data on page load
+    loadData();
+</script>
+
+</body>
+</html>
