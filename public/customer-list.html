@@ -272,7 +272,7 @@
                 }
             } catch (error) {
                 console.error("Clear failed:", error);
-                alert("Failed to clear cloud data. Check console for errors.");
+                alert("Failed to clear cloud data: " + error.message);
             }
         }
     }
