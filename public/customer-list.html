@@ -175,18 +175,16 @@
                 </tr>
             </thead>
             <tbody id="tableBody">
-                <!-- Data will be injected here via JS -->
+                <!-- Data injected here -->
             </tbody>
         </table>
     </div>
 </div>
 
 <script type="module">
-    // Firebase SDK from CDN
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    // Hardcoded Firebase Config for access
     const firebaseConfig = {
         apiKey: "AIzaSyBhBP-fOxGbDhML-uwdiogg64edbXa2GJ4",
         authDomain: "the-london-salon-ninja.firebaseapp.com",
@@ -201,41 +199,26 @@
         const tableBody = document.getElementById('tableBody');
         let customers = [];
         
-        // 1. Try to fetch from Firebase Cloud
         try {
             const app = initializeApp(firebaseConfig);
             const db = getFirestore(app);
-            
             const docSnap = await getDoc(doc(db, 'salon_vault', 'Submissions'));
             if (docSnap.exists()) {
                 customers = docSnap.data().data || [];
-                console.log("Loaded from Submissions");
             }
         } catch (error) {
-            console.error("Firebase fetch failed, falling back to local storage:", error);
+            console.error("Firebase fetch failed:", error);
         }
 
-        // 2. Fallback to Local Storage if Cloud is empty or fails
         if (customers.length === 0) {
             customers = JSON.parse(localStorage.getItem('salon_customers_v7')) || [];
-            console.log("Loaded from Local Storage");
         }
         
         if (customers.length === 0) {
-            tableBody.innerHTML = `
-                <tr>
-                    <td colspan="4">
-                        <div class="empty-state">
-                            <h3>No submissions yet</h3>
-                            <p>Once a customer fills out the form, their details will appear here.</p>
-                        </div>
-                    </td>
-                </tr>
-            `;
+            tableBody.innerHTML = '<tr><td colspan="4"><div class="empty-state"><h3>No submissions yet</h3></div></td></tr>';
             return;
         }
 
-        // Sort by newest first (joinDate)
         customers.sort((a, b) => new Date(b.joinDate) - new Date(a.joinDate));
 
         tableBody.innerHTML = customers.map(c => `
@@ -251,32 +234,24 @@
     }
 
     window.clearData = async function() {
-        if(confirm("Are you sure you want to delete ALL submissions from the cloud? This action cannot be undone.")) {
+        if(confirm("Are you sure you want to delete ALL submissions from the cloud?")) {
             try {
                 const app = initializeApp(firebaseConfig);
                 const db = getFirestore(app);
-                
-                // Reset the Submissions document in Firebase
-                const docRef = doc(db, 'salon_vault', 'Submissions');
-                await setDoc(docRef, {
+                await setDoc(doc(db, 'salon_vault', 'Submissions'), {
                     data: [],
                     updatedAt: new Date().toISOString(),
                     updatedBy: 'Customer-List-Clear'
                 });
-                
-                // Also clear local redundancy
                 localStorage.removeItem('salon_customers_v7');
-                
-                alert("All submissions cleared from cloud and local storage.");
+                alert("All submissions cleared.");
                 loadData();
             } catch (error) {
-                console.error("Clear failed:", error);
                 alert("Failed to clear cloud data: " + error.message);
             }
         }
-    }
+    };
 
-    // Load data on page load
     loadData();
 </script>
 

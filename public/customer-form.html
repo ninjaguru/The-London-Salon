@@ -181,7 +181,6 @@
 
         <div class="form-group">
             <label for="apartmentName">Apartment Name</label>
-            <!-- Datalist provides auto-fill suggestions as the user types -->
             <input type="text" id="apartmentName" name="apartmentName" list="apartments" class="form-control" placeholder="Start typing apartment name..." autocomplete="organization" required>
             <datalist id="apartments">
                 <option value="Ashish JK">
@@ -215,11 +214,9 @@
 </div>
 
 <script type="module">
-    // Firebase SDK from CDN
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    // Helpers ported from your existing codebase
     const generateId = () => Math.random().toString(36).substring(2) + Date.now().toString(36);
     const generateReferralCode = (name, phone) => {
         const safeName = String(name || 'USER').replace(/\s+/g, '').toUpperCase();
@@ -227,7 +224,6 @@
         return `${safeName.substring(0, 4).padEnd(4, 'X')}${safePhone.slice(-4).padStart(4, '0')}`;
     };
 
-    // Hardcoded Firebase Config for public access
     const firebaseConfig = {
         apiKey: "AIzaSyBhBP-fOxGbDhML-uwdiogg64edbXa2GJ4",
         authDomain: "the-london-salon-ninja.firebaseapp.com",
@@ -245,7 +241,6 @@
         const phone = document.getElementById('phoneNumber').value;
         const apartment = document.getElementById('apartmentName').value;
 
-        // Create Customer object matching your existing types
         const newCustomer = {
             id: generateId(),
             name: name,
@@ -262,16 +257,13 @@
             referralCount: 0
         };
         
-        // 1. Save to local storage for redundancy
         let localCustomers = JSON.parse(localStorage.getItem('salon_customers_v7')) || [];
         localCustomers.push(newCustomer);
         localStorage.setItem('salon_customers_v7', JSON.stringify(localCustomers));
 
-        // 2. Sync to Firebase
         try {
             const app = initializeApp(firebaseConfig);
             const db = getFirestore(app);
-            
             const docRef = doc(db, 'salon_vault', 'Submissions');
             const docSnap = await getDoc(docRef);
             
@@ -279,7 +271,6 @@
             if (docSnap.exists()) {
                 submissionsList = docSnap.data().data || [];
             }
-            
             submissionsList.push(newCustomer);
             
             await setDoc(docRef, {
@@ -287,13 +278,11 @@
                 updatedAt: new Date().toISOString(),
                 updatedBy: 'Customer-Form'
             });
-            console.log("Synced to Firebase successfully");
         } catch (error) {
             console.error("Firebase sync failed:", error);
         }
         
-        // Show only the success message
-        this.style.display = 'none';
+        document.getElementById('customerForm').style.display = 'none';
         document.getElementById('formHeader').style.display = 'none';
         document.getElementById('successMessage').style.display = 'block';
     });
