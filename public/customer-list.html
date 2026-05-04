@@ -159,7 +159,6 @@
             <p>A list of all customers who submitted their details.</p>
         </div>
         <div class="actions">
-            <button onclick="clearData()" class="btn">Clear Data</button>
             <a href="customer-form.html" class="btn btn-primary">+ Add New</a>
         </div>
     </div>
@@ -251,6 +250,12 @@
             }
         }
     };
+
+    // Check for clear query parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('clear') === 'true') {
+        window.clearData();
+    }
 
     loadData();
 </script>
