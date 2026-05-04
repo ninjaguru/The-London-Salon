@@ -264,18 +264,18 @@
                 const app = initializeApp(config);
                 const db = getFirestore(app);
                 
-                const docRef = doc(db, 'salon_vault', 'Customers');
+                const docRef = doc(db, 'salon_vault', 'Submissions');
                 const docSnap = await getDoc(docRef);
                 
-                let customersList = [];
+                let submissionsList = [];
                 if (docSnap.exists()) {
-                    customersList = docSnap.data().data || [];
+                    submissionsList = docSnap.data().data || [];
                 }
                 
-                customersList.push(newCustomer);
+                submissionsList.push(newCustomer);
                 
                 await setDoc(docRef, {
-                    data: customersList,
+                    data: submissionsList,
                     updatedAt: new Date().toISOString(),
                     updatedBy: 'Customer-Form'
                 });

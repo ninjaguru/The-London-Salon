@@ -198,10 +198,10 @@
                 const app = initializeApp(config);
                 const db = getFirestore(app);
                 
-                const docSnap = await getDoc(doc(db, 'salon_vault', 'Customers'));
+                const docSnap = await getDoc(doc(db, 'salon_vault', 'Submissions'));
                 if (docSnap.exists()) {
                     customers = docSnap.data().data || [];
-                    console.log("Loaded from Firebase");
+                    console.log("Loaded from Submissions");
                 }
             }
         } catch (error) {
