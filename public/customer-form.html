@@ -274,21 +274,20 @@
             
             const docRef = doc(db, 'salon_vault', 'Submissions');
             const docSnap = await getDoc(docRef);
-                
-                let submissionsList = [];
-                if (docSnap.exists()) {
-                    submissionsList = docSnap.data().data || [];
-                }
-                
-                submissionsList.push(newCustomer);
-                
-                await setDoc(docRef, {
-                    data: submissionsList,
-                    updatedAt: new Date().toISOString(),
-                    updatedBy: 'Customer-Form'
-                });
-                console.log("Synced to Firebase successfully");
+            
+            let submissionsList = [];
+            if (docSnap.exists()) {
+                submissionsList = docSnap.data().data || [];
             }
+            
+            submissionsList.push(newCustomer);
+            
+            await setDoc(docRef, {
+                data: submissionsList,
+                updatedAt: new Date().toISOString(),
+                updatedBy: 'Customer-Form'
+            });
+            console.log("Synced to Firebase successfully");
         } catch (error) {
             console.error("Firebase sync failed:", error);
         }
