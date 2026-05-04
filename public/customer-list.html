@@ -181,10 +181,38 @@
     </div>
 </div>
 
-<script>
-    function loadData() {
+<script type="module">
+    // Firebase SDK from CDN
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    async function loadData() {
         const tableBody = document.getElementById('tableBody');
-        const customers = JSON.parse(localStorage.getItem('customers')) || [];
+        let customers = [];
+        
+        // 1. Try to fetch from Firebase Cloud
+        try {
+            const configStr = localStorage.getItem('salon_firebase_config');
+            if (configStr) {
+                const config = JSON.parse(configStr);
+                const app = initializeApp(config);
+                const db = getFirestore(app);
+                
+                const docSnap = await getDoc(doc(db, 'salon_vault', 'Customers'));
+                if (docSnap.exists()) {
+                    customers = docSnap.data().data || [];
+                    console.log("Loaded from Firebase");
+                }
+            }
+        } catch (error) {
+            console.error("Firebase fetch failed, falling back to local storage:", error);
+        }
+
+        // 2. Fallback to Local Storage if Cloud is empty or fails
+        if (customers.length === 0) {
+            customers = JSON.parse(localStorage.getItem('salon_customers_v7')) || [];
+            console.log("Loaded from Local Storage");
+        }
         
         if (customers.length === 0) {
             tableBody.innerHTML = `
@@ -200,22 +228,24 @@
             return;
         }
 
-        // Sort by newest first
-        customers.sort((a, b) => b.id - a.id);
+        // Sort by newest first (joinDate)
+        customers.sort((a, b) => new Date(b.joinDate) - new Date(a.joinDate));
 
         tableBody.innerHTML = customers.map(c => `
             <tr>
                 <td class="name-cell">${c.name}</td>
                 <td>${c.phone}</td>
                 <td><span class="badge">${c.apartment}</span></td>
-                <td style="color: var(--text-muted); font-size: 13px;">${c.date}</td>
+                <td style="color: var(--text-muted); font-size: 13px;">
+                    ${new Date(c.joinDate).toLocaleDateString()} ${new Date(c.joinDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                </td>
             </tr>
         `).join('');
     }
 
-    function clearData() {
-        if(confirm("Are you sure you want to delete all submissions?")) {
-            localStorage.removeItem('customers');
+    window.clearData = function() {
+        if(confirm("Are you sure you want to delete all LOCAL submissions? Cloud data must be managed via the main dashboard.")) {
+            localStorage.removeItem('salon_customers_v7');
             loadData();
         }
     }

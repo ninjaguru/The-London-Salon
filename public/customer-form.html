@@ -207,41 +207,81 @@
     </div>
 </div>
 
-<script>
-    document.getElementById('customerForm').addEventListener('submit', function(e) {
+<script type="module">
+    // Firebase SDK from CDN
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    // Helpers ported from your existing codebase
+    const generateId = () => Math.random().toString(36).substring(2) + Date.now().toString(36);
+    const generateReferralCode = (name, phone) => {
+        const safeName = String(name || 'USER').replace(/\s+/g, '').toUpperCase();
+        const safePhone = String(phone || '0000').replace(/\D/g, '');
+        return `${safeName.substring(0, 4).padEnd(4, 'X')}${safePhone.slice(-4).padStart(4, '0')}`;
+    };
+
+    document.getElementById('customerForm').addEventListener('submit', async function(e) {
         e.preventDefault();
         
-        // Create customer object
+        const name = document.getElementById('customerName').value;
+        const phone = document.getElementById('phoneNumber').value;
+        const apartment = document.getElementById('apartmentName').value;
+
+        // Create Customer object matching your existing types
         const newCustomer = {
-            id: Date.now(),
-            name: document.getElementById('customerName').value,
-            phone: document.getElementById('phoneNumber').value,
-            apartment: document.getElementById('apartmentName').value,
-            date: new Date().toLocaleString()
+            id: generateId(),
+            name: name,
+            phone: phone,
+            apartment: apartment,
+            email: '',
+            birthday: '',
+            anniversary: '',
+            isMember: false,
+            walletBalance: 0,
+            joinDate: new Date().toISOString(),
+            activeCoupons: [],
+            referralCode: generateReferralCode(name, phone),
+            referralCount: 0
         };
         
-        // Save to browser's localStorage
-        let customers = JSON.parse(localStorage.getItem('customers')) || [];
-        customers.push(newCustomer);
-        localStorage.setItem('customers', JSON.stringify(customers));
+        // 1. Save to local storage for redundancy
+        let localCustomers = JSON.parse(localStorage.getItem('salon_customers_v7')) || [];
+        localCustomers.push(newCustomer);
+        localStorage.setItem('salon_customers_v7', JSON.stringify(localCustomers));
+
+        // 2. Sync to Firebase if configured
+        try {
+            const configStr = localStorage.getItem('salon_firebase_config');
+            if (configStr) {
+                const config = JSON.parse(configStr);
+                const app = initializeApp(config);
+                const db = getFirestore(app);
+                
+                const docRef = doc(db, 'salon_vault', 'Customers');
+                const docSnap = await getDoc(docRef);
+                
+                let customersList = [];
+                if (docSnap.exists()) {
+                    customersList = docSnap.data().data || [];
+                }
+                
+                customersList.push(newCustomer);
+                
+                await setDoc(docRef, {
+                    data: customersList,
+                    updatedAt: new Date().toISOString(),
+                    updatedBy: 'Customer-Form'
+                });
+                console.log("Synced to Firebase successfully");
+            }
+        } catch (error) {
+            console.error("Firebase sync failed:", error);
+        }
         
-        // Hide form and show success message
+        // Show only the success message
         this.style.display = 'none';
         document.getElementById('formHeader').style.display = 'none';
         document.getElementById('successMessage').style.display = 'block';
-
-        // Add helpful links after submission
-        const successDiv = document.getElementById('successMessage');
-        if (!document.getElementById('actionLinks')) {
-            const actionLinks = document.createElement('div');
-            actionLinks.id = 'actionLinks';
-            actionLinks.style.marginTop = '25px';
-            actionLinks.innerHTML = `
-                <a href="customer-list.html" style="display: block; margin-bottom: 15px; background: var(--primary); color: white; text-decoration: none; padding: 10px 15px; border-radius: 8px; font-weight: 600;">View Submissions</a>
-                <a href="#" onclick="location.reload()" style="color: var(--text-muted); text-decoration: none; font-size: 14px; border-bottom: 1px solid currentColor;">Submit Another</a>
-            `;
-            successDiv.appendChild(actionLinks);
-        }
     });
 </script>
 
