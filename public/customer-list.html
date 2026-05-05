@@ -167,6 +167,7 @@
         <table>
             <thead>
                 <tr>
+                    <th>Token</th>
                     <th>Name</th>
                     <th>Phone Number</th>
                     <th>Apartment Name</th>
@@ -222,6 +223,7 @@
 
         tableBody.innerHTML = customers.map(c => `
             <tr>
+                <td><span class="badge" style="background: #f1f5f9; color: var(--text-main); font-family: monospace; letter-spacing: 1px;">${c.token || 'N/A'}</span></td>
                 <td class="name-cell">${c.name}</td>
                 <td>${c.phone}</td>
                 <td><span class="badge">${c.apartment}</span></td>

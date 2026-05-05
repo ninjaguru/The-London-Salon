@@ -226,6 +226,12 @@
         <div class="success-icon">✨</div>
         <h2>Thank You!</h2>
         <p>Your details have been submitted successfully.</p>
+        
+        <div style="margin-top: 25px; padding: 20px; background: #f8fafc; border-radius: 16px; border: 2px dashed var(--primary); display: inline-block; min-width: 200px;">
+            <p style="font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px; color: var(--text-muted);">Your Token Number</p>
+            <h1 id="tokenDisplay" style="margin: 0; color: var(--primary); letter-spacing: 4px; font-size: 32px; font-family: monospace;">----</h1>
+        </div>
+        <p style="margin-top: 15px; font-size: 12px;">Please show this token to our staff.</p>
     </div>
 </div>
 
@@ -234,6 +240,7 @@
     import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const generateId = () => Math.random().toString(36).substring(2) + Date.now().toString(36);
+    const generateToken = () => Math.random().toString(36).substring(2, 6).toUpperCase();
     const generateReferralCode = (name, phone) => {
         const safeName = String(name || 'USER').replace(/\s+/g, '').toUpperCase();
         const safePhone = String(phone || '0000').replace(/\D/g, '');
@@ -270,7 +277,8 @@
             joinDate: new Date().toISOString(),
             activeCoupons: [],
             referralCode: generateReferralCode(name, phone),
-            referralCount: 0
+            referralCount: 0,
+            token: generateToken()
         };
         
         let localCustomers = JSON.parse(localStorage.getItem('salon_customers_v7')) || [];
@@ -305,6 +313,7 @@
         
         // Hide spinner and show success
         document.getElementById('loadingSpinner').style.display = 'none';
+        document.getElementById('tokenDisplay').innerText = newCustomer.token;
         document.getElementById('successMessage').style.display = 'block';
     });
 </script>
