@@ -219,6 +219,18 @@
             </datalist>
         </div>
 
+        <div class="form-group">
+            <label for="discoverySource">How did you know about us?</label>
+            <select id="discoverySource" name="discoverySource" class="form-control" required>
+                <option value="" disabled selected>Select an option</option>
+                <option value="Friends">Friends</option>
+                <option value="Google">Google</option>
+                <option value="Instagram">Instagram</option>
+                <option value="Facebook">Facebook</option>
+                <option value="Others">Others</option>
+            </select>
+        </div>
+
         <button type="submit" class="btn-submit">Submit Details</button>
     </form>
 
@@ -265,6 +277,7 @@
         const name = document.getElementById('customerName').value;
         const phone = document.getElementById('phoneNumber').value;
         const apartment = document.getElementById('apartmentName').value;
+        const source = document.getElementById('discoverySource').value;
 
         const newCustomer = {
             id: generateId(),
@@ -280,7 +293,8 @@
             activeCoupons: [],
             referralCode: generateReferralCode(name, phone),
             referralCount: 0,
-            token: generateToken()
+            token: generateToken(),
+            source: source
         };
         
         let localCustomers = JSON.parse(localStorage.getItem('salon_customers_v7')) || [];

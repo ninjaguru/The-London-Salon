@@ -169,9 +169,10 @@
                 <tr>
                     <th>Token</th>
                     <th>Name</th>
-                    <th>Phone Number</th>
-                    <th>Apartment Name</th>
-                    <th>Submission Date</th>
+                    <th>Phone</th>
+                    <th>Apartment</th>
+                    <th>Source</th>
+                    <th>Date</th>
                 </tr>
             </thead>
             <tbody id="tableBody">
@@ -227,6 +228,7 @@
                 <td class="name-cell">${c.name}</td>
                 <td>${c.phone}</td>
                 <td><span class="badge">${c.apartment}</span></td>
+                <td>${c.source || 'N/A'}</td>
                 <td style="color: var(--text-muted); font-size: 13px;">
                     ${new Date(c.joinDate).toLocaleDateString()} ${new Date(c.joinDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                 </td>
